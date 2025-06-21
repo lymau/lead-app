@@ -189,8 +189,6 @@ def get_single_lead(search_params):
 st.title("Leads Management - SISINDOKOM")
 st.markdown("---")
 
-st.info("Pastikan Anda telah mengganti `APPS_SCRIPT_API_URL` di kode dengan URL Web App Google Apps Script Anda!")
-
 # Tab navigasi
 tab1, tab2, tab3 = st.tabs(["Tambah Lead", "Lihat Semua Leads", "Cari Lead"])
 
