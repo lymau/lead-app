@@ -3,7 +3,7 @@ import requests
 import json
 import pandas as pd
 
-APPS_SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbzXwjAnxxUZTTSytvQEVQRiXLXLtQsZgPuBcjW2wKDgR9i1Xn5hCj_5IC7vHq79Nog/exec"
+APPS_SCRIPT_API_URL = st.secrets['api_url']
 
 st.set_page_config(
     page_title="Leads Management - SISINDOKOM",
