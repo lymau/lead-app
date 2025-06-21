@@ -186,7 +186,7 @@ st.markdown("---")
 st.info("Pastikan Anda telah mengganti `APPS_SCRIPT_API_URL` di kode dengan URL Web App Google Apps Script Anda!")
 
 # Tab navigasi
-tab1, tab2, tab3, tab4 = st.tabs(["Tambah Lead", "Update Lead", "Lihat Semua Leads", "Cari Lead"])
+tab1, tab2, tab3 = st.tabs(["Tambah Lead", "Lihat Semua Leads", "Cari Lead"])
 
 with tab1:
     st.header("Tambah Lead Baru")
@@ -247,45 +247,8 @@ with tab1:
         else:
             st.warning("Nama Kesempatan wajib diisi.")
 
+
 with tab2:
-    st.header("Update Data Lead")
-    with st.form("update_lead_form"):
-        update_id = st.text_input("ID Lead (Wajib)", key="update_id")
-        update_name = st.text_input("Nama Lead", key="update_name")
-        update_email = st.text_input("Email", key="update_email")
-        update_phone = st.text_input("Telepon", key="update_phone")
-        update_product_service = st.text_input("Produk/Jasa", key="update_product_service")
-        update_status = st.selectbox("Status", ["New", "Contacted", "Qualified", "Unqualified", "Closed Won", "Closed Lost"], key="update_status_select", index=0)
-        update_source = st.text_input("Sumber Lead", key="update_source")
-        update_notes = st.text_area("Catatan", key="update_notes")
-
-        submitted_update = st.form_submit_button("Update Lead")
-        if submitted_update:
-            if update_id:
-                update_data = {"id": update_id}
-                if update_name: update_data["name"] = update_name
-                if update_email: update_data["email"] = update_email
-                if update_phone: update_data["phone"] = update_phone
-                if update_product_service: update_data["product_service"] = update_product_service
-                if update_status: update_data["status"] = update_status
-                if update_source: update_data["source"] = update_source
-                if update_notes: update_data["notes"] = update_notes
-
-                if len(update_data) > 1: # Pastikan ada data selain ID
-                    with st.spinner("Memperbarui lead..."):
-                        response = update_lead(update_data)
-                        if response and response.get("status") == 200:
-                            st.success(response.get("message", "Lead berhasil diperbarui!"))
-                            st.json(response.get("data"))
-                        else:
-                            st.error(response.get("message", "Gagal memperbarui lead."))
-                            st.json(response)
-                else:
-                    st.warning("Masukkan setidaknya satu kolom lain selain ID untuk di-update.")
-            else:
-                st.warning("ID Lead wajib diisi untuk melakukan update.")
-
-with tab3:
     st.header("Semua Data Leads")
     if st.button("Refresh Leads"):
         with st.spinner("Mengambil semua leads..."):
@@ -301,24 +264,71 @@ with tab3:
                 st.error(response.get("message", "Gagal mengambil semua leads."))
                 st.json(response)
 
-with tab4:
+with tab3:
     st.header("Cari Lead")
-    search_by_option = st.selectbox("Cari berdasarkan", ["ID", "Nama", "Email", "Status"], key="search_option")
-    search_query = st.text_input(f"Masukkan {search_by_option} untuk dicari", key="search_query")
+    keywords = [
+        "Responsible",
+        "Observer",
+        "Pilar",
+        "Solusi",
+        "Layanan",
+        "Brand",
+        "Perusahaan",
+        "Stage",
+    ]
+    search_by_option = st.selectbox("Cari berdasarkan", keywords, key="search_option")
+
+    if search_by_option == "Responsible":
+        responsible_keywords = [x.get("Responsible", "Unknown") for x in get_master('getResponsibles')]
+        search_query = st.selectbox("Pilih Responsible", responsible_keywords, key="search_query")
+    elif search_by_option == "Observer":
+        observer_keywords = [x.get("Observers", "Unknown") for x in get_master('getObservers')]
+        search_query = st.selectbox("Pilih Observer", observer_keywords, key="search_query")
+    elif search_by_option == "Pilar":
+        pillar_keywords = get_pillars()
+        search_query = st.selectbox("Pilih Pilar", pillar_keywords, key="search_query")
+    elif search_by_option == "Solusi":
+        pillar = st.selectbox("Pilih Pilar untuk Solusi", get_pillars(), key="search_pillar")
+        solution_keywords = get_solutions(pillar)
+        search_query = st.selectbox("Pilih Solusi", solution_keywords, key="search_query")
+    elif search_by_option == "Layanan":
+        pillar = st.selectbox("Pilih Pilar untuk Layanan", get_pillars(), key="search_pillar_service")
+        solution = st.selectbox("Pilih Solusi untuk Layanan", get_solutions(pillar), key="search_solution")
+        service_keywords = get_services(solution)
+        search_query = st.selectbox("Pilih Layanan", service_keywords, key="search_query")
+    elif search_by_option == "Brand":
+        brand_keywords = [x.get("Brand", "Unknown") for x in get_master('getBrands')]
+        search_query = st.selectbox("Pilih Brand", brand_keywords, key="search_query")
+    elif search_by_option == "Perusahaan":
+        company_keywords = [x.get("Company", "Unknown") for x in get_master('getCompanies')]
+        search_query = st.selectbox("Pilih Perusahaan", company_keywords, key="search_query")
+    elif search_by_option == "Stage":
+        stage_keywords = ["Open", "Deal Won", "Deal Lost"]
+        search_query = st.selectbox("Pilih Tahap", stage_keywords, key="search_query")
 
     if st.button("Cari Lead"):
         if search_query:
             search_params = {}
-            if search_by_option == "ID":
-                search_params["id"] = search_query
-            elif search_by_option == "Nama":
-                search_params["name"] = search_query
-            elif search_by_option == "Email":
-                search_params["email"] = search_query
-            elif search_by_option == "Status":
-                search_params["status"] = search_query
+            if search_by_option == "Responsible":
+                search_params["ResponsibleName"] = search_query
+            elif search_by_option == "Observer":
+                search_params["ObserverName"] = search_query
+            elif search_by_option == "Pilar":
+                search_params["Pillar"] = search_query
+            elif search_by_option == "Solusi":
+                search_params["Solution"] = search_query
+            elif search_by_option == "Layanan":
+                search_params["Service"] = search_query
+            elif search_by_option == "Brand":
+                search_params["Brand"] = search_query
+            elif search_by_option == "Perusahaan":
+                search_params["CompanyName"] = search_query
+            elif search_by_option == "Stage":
+                search_params["Stage"] = search_query
+            else:
+                st.error("Opsi pencarian tidak valid.")
 
-            with st.spinner(f"Mencari lead berdasarkan {search_by_option}..."):
+            with st.spinner(f"Mencari lead berdasarkan {search_by_option}: {search_query}..."):
                 response = get_single_lead(search_params)
                 if response and response.get("status") == 200:
                     found_leads = response.get("data")
