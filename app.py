@@ -190,7 +190,7 @@ st.title("Leads Management - SISINDOKOM")
 st.markdown("---")
 
 # Tab navigasi
-tab1, tab2, tab3 = st.tabs(["Tambah Lead", "Lihat Semua Leads", "Cari Lead"])
+tab1, tab2, tab3, tab4 = st.tabs(["Tambah Lead", "Lihat Semua Leads", "Cari Lead", "Update Lead"])
 
 with tab1:
     st.header("Tambah Lead Baru")
@@ -358,4 +358,61 @@ with tab3:
                     st.json(response)
         else:
             st.warning("Harap masukkan query pencarian.")
+
+    with tab4:
+        # show all fields but it should not be editable, except for the notes, cost, and stage
+        st.header("Update Lead")
+        lead_id = st.text_input("Masukkan UUID Lead yang ingin diupdate", key="lead_id")
+        update_button = st.button("Ambil Data Lead")
+        lead = {}
+        if update_button and lead_id:
+            with st.spinner(f"Mengambil data lead dengan UUID: {lead_id}..."):
+                response = get_single_lead({"ID": lead_id})
+                if response and response.get("status") == 200:
+                    lead_data = response.get("data")
+                    if lead_data:
+                        lead = lead_data[0]
+                        st.write(f"🆔 **Data Lead dengan UUID:** {lead_id}")
+                        st.write(f"👤 **Presales:** {lead.get('PresalesName', 'Unknown')}")
+                        st.write(f"👁️ **Observer:** {lead.get('ObserverName', 'Unknown')}")
+                        st.write(f"🧑‍💼 **Responsible:** {lead.get('ResponsibleName', 'Unknown')}")
+                        st.write(f"🏷️ **Opportunity:** {lead.get('OpportunityName', 'Unknown')}")
+                        st.write(f"🏛️ **Pillar:** {lead.get('Pillar', 'Unknown')}")
+                        st.write(f"🧩 **Solution:** {lead.get('Solution', 'Unknown')}")
+                        st.write(f"🛠️ **Service:** {lead.get('Service', 'Unknown')}")
+                        st.write(f"🏷️ **Brand:** {lead.get('Brand', 'Unknown')}")
+                        st.write(f"📡 **Channel:** {lead.get('Channel', 'Unknown')}")
+                        st.write(f"🏢 **Company:** {lead.get('CompanyName', 'Unknown')}")
+                        st.write(f"🏭 **Vertical Industry:** {lead.get('VerticalIndustry', 'Unknown')}")
+                        st.write(f"💰 **Cost:** {lead.get('Cost', 0)}")
+                        st.write(f"📊 **Stage:** {lead.get('Stage', 'Unknown')}")
+                        st.write(f"📝 **Notes:** {lead.get('Notes', 'No notes available')}")
+                        st.write(f"📅 **Created At:** {lead.get('CreatedAt', 'Unknown')}")
+                        st.write(f"⏰ **Updated At:** {lead.get('UpdatedAt', 'Unknown')}")
+
+                    else:
+                        st.warning("Tidak ada lead ditemukan dengan UUID tersebut.")
+                else:
+                    st.error(response.get("message", "Gagal mengambil data lead."))
+                    st.json(response)   
+        with st.form(key="update_lead_form"):
+            # editable fields
+            notes = st.text_area("Catatan (Notes)", value=lead.get("Notes", ""), height=100, key="update_notes")
+            cost = st.number_input("Biaya (Cost)", value=lead.get("Cost", 0), min_value=0, step=10000, key="update_cost")
+            stage = st.selectbox("Tahap (Stage)", ["Open", "Deal Won", "Deal Lost"], index=["Open", "Deal Won", "Deal Lost"].index(lead.get("Stage", "Open")), key="update_stage")
+            submit_button = st.form_submit_button("Update Lead")
+            if submit_button:
+                update_data = {
+                                "ID": lead_id,
+                                "Notes": notes,
+                                "Cost": cost,
+                                "Stage": stage
+                            }
+
+                with st.spinner("Memperbarui lead..."):
+                    update_response = update_lead(update_data)
+                    if update_response and update_response.get("status") == 200:
+                        st.success(update_response.get("message"))
+                    else:
+                        st.error(update_response.get("message", "Gagal memperbarui lead."))
 
