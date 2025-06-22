@@ -195,9 +195,12 @@ tab1, tab2, tab3 = st.tabs(["Tambah Lead", "Lihat Semua Leads", "Cari Lead"])
 with tab1:
     st.header("Tambah Lead Baru")
 
+    presales_name = st.selectbox("Pilih Presales", get_master('getPresales'), format_func=lambda x: x.get("PresalesName", "Unknown"), key="presales_name")
+
     observer_name = st.selectbox("Pilih Observer", get_master('getObservers'), format_func=lambda x: x.get("Observers", "Unknown"), key="observer_name")
     responsible_name = st.selectbox("Pilih Penanggung Jawab", get_master('getResponsibles'), format_func=lambda x: x.get("Responsible", "Unknown"), key="responsible_name")
-    opportunity_name = st.text_input("Nama Kesempatan", key="opportunity_name")
+    opportunity_name = st.selectbox("Nama Kesempatan", get_master('getOpportunities'), format_func=lambda x: x.get("Desc", "Unknown"), 
+                                    key="opportunity_name", accept_new_options=True, index=None, placeholder="Pilih atau masukkan nama kesempatan baru")
 
     pillar = st.selectbox("Pilih Pilar", get_pillars(), key="pillar")
     solution = st.selectbox("Pilih Solusi", get_solutions(pillar), key="solution")
@@ -227,9 +230,10 @@ with tab1:
     if submitted_add:
         if opportunity_name:
             data = {
+                "presales_name": presales_name.get("PresalesName", ""),
                 "observer_name": observer_name.get("Observers", ""),
                 "responsible_name": responsible_name.get("Responsible", ""),
-                "opportunity_name": opportunity_name,
+                "opportunity_name": opportunity_name.get("Desc", "") if isinstance(opportunity_name, dict) else opportunity_name,
                 "pillar": pillar,
                 "solution": solution,
                 "service": service,
@@ -245,7 +249,9 @@ with tab1:
             with st.spinner("Menambahkan lead baru..."):
                 response = add_lead(data)
                 if response and response.get("status") == 200:
-                    st.success(response.get("message", "Lead berhasil ditambahkan!"))
+                    st.success(response.get("message"))
+                    # get the uuid of the newly added lead
+                    st.info(f"Simpan UUID untuk mengupdate: {response.get('data')['ID']}")
                 else:
                     st.error(response.get("message", "Gagal menambahkan lead."))
         else:
@@ -271,6 +277,7 @@ with tab2:
 with tab3:
     st.header("Cari Lead")
     keywords = [
+        "Presales",
         "Responsible",
         "Observer",
         "Pilar",
@@ -282,7 +289,10 @@ with tab3:
     ]
     search_by_option = st.selectbox("Cari berdasarkan", keywords, key="search_option")
 
-    if search_by_option == "Responsible":
+    if search_by_option == "Presales":
+        presales_keywords = [x.get("PresalesName", "Unknown") for x in get_master('getPresales')]
+        search_query = st.selectbox("Pilih Presales", presales_keywords, key="search_query")
+    elif search_by_option == "Responsible":
         responsible_keywords = [x.get("Responsible", "Unknown") for x in get_master('getResponsibles')]
         search_query = st.selectbox("Pilih Responsible", responsible_keywords, key="search_query")
     elif search_by_option == "Observer":
@@ -313,7 +323,9 @@ with tab3:
     if st.button("Cari Lead"):
         if search_query:
             search_params = {}
-            if search_by_option == "Responsible":
+            if search_by_option == "Presales":
+                search_params["PresalesName"] = search_query
+            elif search_by_option == "Responsible":
                 search_params["ResponsibleName"] = search_query
             elif search_by_option == "Observer":
                 search_params["ObserverName"] = search_query
