@@ -298,27 +298,32 @@ with tab2:
 with tab3:
     st.header("Cari Lead")
     keywords = [
-        "Presales",
-        "Responsible",
-        "Observer",
+        "Inputter",
+        "Account Manager",
+        "Sales Group",
+        "Sales Name",
         "Pilar",
         "Solusi",
         "Layanan",
         "Brand",
+        "Channel",
         "Perusahaan",
-        "Stage",
+        "Distributor"
     ]
     search_by_option = st.selectbox("Cari berdasarkan", keywords, key="search_option")
 
-    if search_by_option == "Presales":
+    if search_by_option == "Inputter":
         presales_keywords = [x.get("PresalesName", "Unknown") for x in get_master('getPresales')]
-        search_query = st.selectbox("Pilih Presales", presales_keywords, key="search_query")
-    elif search_by_option == "Responsible":
+        search_query = st.selectbox("Pilih Inputter", presales_keywords, key="search_query")
+    elif search_by_option == "Account Manager":
         responsible_keywords = [x.get("Responsible", "Unknown") for x in get_master('getResponsibles')]
-        search_query = st.selectbox("Pilih Responsible", responsible_keywords, key="search_query")
-    elif search_by_option == "Observer":
-        observer_keywords = [x.get("Observers", "Unknown") for x in get_master('getObservers')]
-        search_query = st.selectbox("Pilih Observer", observer_keywords, key="search_query")
+        search_query = st.selectbox("Pilih Account Manager", responsible_keywords, key="search_query")
+    elif search_by_option == "Sales Group":
+        sales_group_keywords = [x.get("SalesGroup", "Unknown") for x in get_master('getSalesGroups')]
+        search_query = st.selectbox("Pilih Sales Group", sales_group_keywords, key="search_query")
+    elif search_by_option == "Sales Name":
+        sales_name_keywords = [x.get("SalesName", "Unknown") for x in get_master('getSalesGroups')]
+        search_query = st.selectbox("Pilih Sales Name", sales_name_keywords, key="search_query")
     elif search_by_option == "Pilar":
         pillar_keywords = get_pillars()
         search_query = st.selectbox("Pilih Pilar", pillar_keywords, key="search_query")
@@ -334,34 +339,41 @@ with tab3:
     elif search_by_option == "Brand":
         brand_keywords = [x.get("Brand", "Unknown") for x in get_master('getBrands')]
         search_query = st.selectbox("Pilih Brand", brand_keywords, key="search_query")
+    elif search_by_option == "Channel":
+        channel_keywords = [x.get("Channel", "Unknown") for x in get_master('getBrands')]
+        search_query = st.selectbox("Pilih Channel", channel_keywords, key="search_query")
     elif search_by_option == "Perusahaan":
         company_keywords = [x.get("Company", "Unknown") for x in get_master('getCompanies')]
         search_query = st.selectbox("Pilih Perusahaan", company_keywords, key="search_query")
-    elif search_by_option == "Stage":
-        stage_keywords = ["Open", "Deal Won", "Deal Lost"]
-        search_query = st.selectbox("Pilih Tahap", stage_keywords, key="search_query")
+    elif search_by_option == "Distributor":
+        distributor_keywords = [x.get("Distributor", "Unknown") for x in get_master('getDistributors')]
+        search_query = st.selectbox("Pilih Distributor", distributor_keywords, key="search_query")
 
     if st.button("Cari Lead"):
         if search_query:
             search_params = {}
-            if search_by_option == "Presales":
-                search_params["PresalesName"] = search_query
-            elif search_by_option == "Responsible":
-                search_params["ResponsibleName"] = search_query
-            elif search_by_option == "Observer":
-                search_params["ObserverName"] = search_query
+            if search_by_option == "Inputter":
+                search_params["presales_name"] = search_query
+            elif search_by_option == "Account Manager":
+                search_params["responsible_name"] = search_query
+            elif search_by_option == "Sales Group":
+                search_params["salesgroup_id"] = search_query
+            elif search_by_option == "Sales Name":
+                search_params["sales_name"] = search_query
             elif search_by_option == "Pilar":
                 search_params["pillar"] = search_query
             elif search_by_option == "Solusi":
-                search_params["Solution"] = search_query
+                search_params["solution"] = search_query
             elif search_by_option == "Layanan":
-                search_params["Service"] = search_query
+                search_params["service"] = search_query
             elif search_by_option == "Brand":
-                search_params["Brand"] = search_query
+                search_params["brand"] = search_query
+            elif search_by_option == "Channel":
+                search_params["channel"] = search_query
             elif search_by_option == "Perusahaan":
-                search_params["CompanyName"] = search_query
-            elif search_by_option == "Stage":
-                search_params["Stage"] = search_query
+                search_params["company_name"] = search_query
+            elif search_by_option == "Distributor":
+                search_params["distributor_name"] = search_query
             else:
                 st.error("Opsi pencarian tidak valid.")
 
