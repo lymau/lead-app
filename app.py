@@ -15,7 +15,7 @@ st.set_page_config(
 # GET ALL MASTER DATA
 # ==============================================================================
 
-@st.cache_data(ttl=3600) # Data akan di-cache selama 1 jam (3600 detik)
+@st.cache_data(ttl=300) # Data akan di-cache selama 1 jam (3600 detik)
 def get_master(action: str):
     """
     Mengambil semua data dari sheet 'OBSERVERS' dari API Apps Script.
@@ -225,17 +225,14 @@ with tab1:
     brand_name = st.selectbox("Pilih Brand", get_master('getBrands'), format_func=lambda x: x.get("Brand", "Unknown"), key="brand_name")
     channel = st.selectbox("Pilih Channel", get_channels(brand_name['Brand']), key="channel")
 
+    
     is_company_listed = st.radio("Apakah perusahaan terdaftar?", ["Ya", "Tidak"], key="is_company_listed")
     if is_company_listed == "Ya":
         company_name = st.selectbox("Pilih Perusahaan", get_master('getCompanies'), format_func=lambda x: x.get("Company", "Unknown"), key="company_name")
         vertical_industry = st.selectbox("Pilih Industri Vertikal", pd.DataFrame(get_master('getCompanies'))[pd.DataFrame(get_master('getCompanies'))['Company'] == company_name['Company']]['Vertical Industry'].unique().tolist(), key="vertical_industry")
     else:
         company_name = st.text_input("Nama Perusahaan (jika tidak terdaftar)", key="company_name")
-        is_vertical_industry_listed = st.radio("Apakah industri vertikal terdaftar?", ["Ya", "Tidak"], key="is_vertical_industry_listed")
-        if is_vertical_industry_listed == "Ya":
-            vertical_industry = st.selectbox("Pilih Industri Vertikal", pd.DataFrame(get_master('getCompanies'))["Vertical Industry"].unique().tolist(), key="vertical_industry")
-        else:
-            vertical_industry = st.text_input("Industri Vertikal (jika tidak terdaftar)", key="vertical_industry")
+        vertical_industry = st.selectbox("Pilih Industri Vertikal", pd.DataFrame(get_master('getCompanies'))["Vertical Industry"].unique().tolist(), key="vertical_industry")
 
     cost = st.number_input("Biaya (Cost)", min_value=0, step=10000, key="cost")
 
@@ -275,7 +272,7 @@ with tab1:
                 if response and response.get("status") == 200:
                     st.success(response.get("message"))
                     # get the uuid of the newly added lead
-                    st.info(f"Simpan UUID untuk mengupdate: {response.get('data')['ID']}")
+                    st.info(f"Simpan UUID untuk mengupdate: {response.get('data')['opportunity_id']}")
                 else:
                     st.error(response.get("message", "Gagal menambahkan lead."))
         else:
@@ -354,7 +351,7 @@ with tab3:
             elif search_by_option == "Observer":
                 search_params["ObserverName"] = search_query
             elif search_by_option == "Pilar":
-                search_params["Pillar"] = search_query
+                search_params["pillar"] = search_query
             elif search_by_option == "Solusi":
                 search_params["Solution"] = search_query
             elif search_by_option == "Layanan":
