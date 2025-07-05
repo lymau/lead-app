@@ -68,6 +68,17 @@ def get_channels(brand):
     channels = df[df['Brand'] == brand]['Channel'].unique().tolist()
     return channels
 
+def get_sales_groups():
+    df = pd.DataFrame(get_master('getSalesGroups'))
+    sales_groups = df['SalesGroup'].unique().tolist()
+    return sales_groups
+
+def get_sales_name_by_sales_group(sales_group):
+    df = pd.DataFrame(get_master('getSalesGroups'))
+    sales_name = df[df['SalesGroup'] == sales_group]['SalesName'].unique().tolist()
+    return sales_name
+
+
 # ==============================================================================
 # FUNGSI UNTUK BERINTERAKSI DENGAN API
 # ==============================================================================
@@ -195,12 +206,17 @@ tab1, tab2, tab3, tab4 = st.tabs(["Tambah Lead", "Lihat Semua Leads", "Cari Lead
 with tab1:
     st.header("Tambah Lead Baru")
 
-    presales_name = st.selectbox("Pilih Presales", get_master('getPresales'), format_func=lambda x: x.get("PresalesName", "Unknown"), key="presales_name")
+    presales_name = st.selectbox("Inputter", get_master('getPresales'), format_func=lambda x: x.get("PresalesName", "Unknown"), key="presales_name")
 
-    observer_name = st.selectbox("Pilih Observer", get_master('getObservers'), format_func=lambda x: x.get("Observers", "Unknown"), key="observer_name")
-    responsible_name = st.selectbox("Pilih Penanggung Jawab", get_master('getResponsibles'), format_func=lambda x: x.get("Responsible", "Unknown"), key="responsible_name")
+    salesgroup_id = st.selectbox("Pilih Sales Group", get_sales_groups(), key="salesgroup_id")
+    sales_name = st.selectbox("Pilih Sales", get_sales_name_by_sales_group(salesgroup_id), format_func=lambda x: x, key="sales_name")
+
+    # observer_name = st.selectbox("Pilih Observer", get_master('getObservers'), format_func=lambda x: x.get("Observers", "Unknown"), key="observer_name")
+    responsible_name = st.selectbox("Pilih Account Manager", get_master('getResponsibles'), format_func=lambda x: x.get("Responsible", "Unknown"), key="responsible_name")
+
     opportunity_name = st.selectbox("Nama Kesempatan", get_master('getOpportunities'), format_func=lambda x: x.get("Desc", "Unknown"), 
                                     key="opportunity_name", accept_new_options=True, index=None, placeholder="Pilih atau masukkan nama kesempatan baru")
+    start_date = st.date_input("Tanggal Mulai", key="start_date")
 
     pillar = st.selectbox("Pilih Pilar", get_pillars(), key="pillar")
     solution = st.selectbox("Pilih Solusi", get_solutions(pillar), key="solution")
@@ -222,18 +238,27 @@ with tab1:
             vertical_industry = st.text_input("Industri Vertikal (jika tidak terdaftar)", key="vertical_industry")
 
     cost = st.number_input("Biaya (Cost)", min_value=0, step=10000, key="cost")
-    stage = st.selectbox("Tahap (Stage)", ["Open", "Deal Won", "Deal Lost"], key="stage")
+
+    is_via_distributor = st.radio("Apakah melalui distributor?", ["Ya", "Tidak"], key="is_via_distributor")
+    if is_via_distributor == "Tidak":
+        distributor_name = "Tidak melalui distributor"
+    else:
+        distributor_name = st.selectbox("Pilih Distributor", get_master('getDistributors'), format_func=lambda x: x.get("Distributor", "Unknown"), key="distributor_name")
+    
     notes = st.text_area("Catatan (Notes)", height=100, key="notes")
     
-    submitted_add = st.button("Tambah Lead")
+    submitted_add = st.button("Kirim")
 
     if submitted_add:
         if opportunity_name:
             data = {
                 "presales_name": presales_name.get("PresalesName", ""),
-                "observer_name": observer_name.get("Observers", ""),
+                "salesgroup_id": salesgroup_id,
+                "sales_name": sales_name,
                 "responsible_name": responsible_name.get("Responsible", ""),
                 "opportunity_name": opportunity_name.get("Desc", "") if isinstance(opportunity_name, dict) else opportunity_name,
+                "start_date": start_date.strftime("%Y-%m-%d"),
+                "distributor_name": distributor_name.get("Distributor", "") if isinstance(distributor_name, dict) else distributor_name,
                 "pillar": pillar,
                 "solution": solution,
                 "service": service,
@@ -242,7 +267,6 @@ with tab1:
                 "company_name": company_name.get("Company", "") if isinstance(company_name, dict) else company_name,
                 "vertical_industry": vertical_industry.get("Vertical Industry", "") if isinstance(vertical_industry, dict) else vertical_industry,
                 "cost": cost,
-                "stage": stage,
                 "notes": notes
             }
             
