@@ -340,7 +340,7 @@ with tab3:
         brand_keywords = [x.get("Brand", "Unknown") for x in get_master('getBrands')]
         search_query = st.selectbox("Pilih Brand", brand_keywords, key="search_query")
     elif search_by_option == "Channel":
-        channel_keywords = [x.get("Channel", "Unknown") for x in get_master('getBrands')]
+        channel_keywords = [x for x in pd.DataFrame(get_master('getBrands'))["Channel"].unique().tolist()]
         search_query = st.selectbox("Pilih Channel", channel_keywords, key="search_query")
     elif search_by_option == "Perusahaan":
         company_keywords = [x.get("Company", "Unknown") for x in get_master('getCompanies')]
