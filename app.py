@@ -433,11 +433,12 @@ with tab3:
             submit_button = st.form_submit_button("Update Lead")
             if submit_button:
                 update_data = {
-                                "Notes": notes,
-                                "Cost": cost,
+                                "uid": uid,
+                                "notes": notes,
+                                "cost": cost,
                             }
 
-                with st.spinner("Memperbarui lead..."):
+                with st.spinner(f"Memperbarui lead {uid}..."):
                     update_response = update_lead(update_data)
                     if update_response and update_response.get("status") == 200:
                         st.success(update_response.get("message"))
