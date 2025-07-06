@@ -272,7 +272,7 @@ with tab1:
                 if response and response.get("status") == 200:
                     st.success(response.get("message"))
                     # get the uuid of the newly added lead
-                    st.info(f"Simpan UUID untuk mengupdate: {response.get('data')['opportunity_id']}")
+                    st.info(f"Simpan UID untuk mengupdate: {response.get('data')['uid']}")
                 else:
                     st.error(response.get("message", "Gagal menambahkan lead."))
         else:
@@ -395,17 +395,17 @@ with tab3:
     with tab4:
         # show all fields but it should not be editable, except for the notes, cost, and stage
         st.header("Update Lead")
-        lead_id = st.text_input("Masukkan UUID Lead yang ingin diupdate", key="lead_id")
+        uid = st.text_input("Masukkan UID untuk mencari lead", key="uid")
         update_button = st.button("Ambil Data Lead")
         lead = {}
-        if update_button and lead_id:
-            with st.spinner(f"Mengambil data lead dengan UUID: {lead_id}..."):
-                response = get_single_lead({"ID": lead_id})
+        if update_button and uid:
+            with st.spinner(f"Mengambil data lead dengan uid: {uid}..."):
+                response = get_single_lead({"uid": uid})
                 if response and response.get("status") == 200:
                     lead_data = response.get("data")
                     if lead_data:
                         lead = lead_data[0]
-                        st.write(f"🆔 **Data Lead dengan UUID:** {lead_id}")
+                        st.write(f"🆔 **Data Lead dengan UID:** {uid}")
                         st.write(f"👤 **Presales:** {lead.get('PresalesName', 'Unknown')}")
                         st.write(f"👁️ **Observer:** {lead.get('ObserverName', 'Unknown')}")
                         st.write(f"🧑‍💼 **Responsible:** {lead.get('ResponsibleName', 'Unknown')}")
@@ -436,7 +436,7 @@ with tab3:
             submit_button = st.form_submit_button("Update Lead")
             if submit_button:
                 update_data = {
-                                "ID": lead_id,
+                                "ID": opportunity_id,
                                 "Notes": notes,
                                 "Cost": cost,
                                 "Stage": stage
