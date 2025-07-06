@@ -406,22 +406,20 @@ with tab3:
                     if lead_data:
                         lead = lead_data[0]
                         st.write(f"🆔 **Data Lead dengan UID:** {uid}")
-                        st.write(f"👤 **Presales:** {lead.get('PresalesName', 'Unknown')}")
-                        st.write(f"👁️ **Observer:** {lead.get('ObserverName', 'Unknown')}")
-                        st.write(f"🧑‍💼 **Responsible:** {lead.get('ResponsibleName', 'Unknown')}")
-                        st.write(f"🏷️ **Opportunity:** {lead.get('OpportunityName', 'Unknown')}")
-                        st.write(f"🏛️ **Pillar:** {lead.get('Pillar', 'Unknown')}")
-                        st.write(f"🧩 **Solution:** {lead.get('Solution', 'Unknown')}")
-                        st.write(f"🛠️ **Service:** {lead.get('Service', 'Unknown')}")
-                        st.write(f"🏷️ **Brand:** {lead.get('Brand', 'Unknown')}")
-                        st.write(f"📡 **Channel:** {lead.get('Channel', 'Unknown')}")
-                        st.write(f"🏢 **Company:** {lead.get('CompanyName', 'Unknown')}")
-                        st.write(f"🏭 **Vertical Industry:** {lead.get('VerticalIndustry', 'Unknown')}")
-                        st.write(f"💰 **Cost:** {lead.get('Cost', 0)}")
-                        st.write(f"📊 **Stage:** {lead.get('Stage', 'Unknown')}")
-                        st.write(f"📝 **Notes:** {lead.get('Notes', 'No notes available')}")
-                        st.write(f"📅 **Created At:** {lead.get('CreatedAt', 'Unknown')}")
-                        st.write(f"⏰ **Updated At:** {lead.get('UpdatedAt', 'Unknown')}")
+                        st.write(f"👤 **Inputter:** {lead.get('presales_name', 'Unknown')}")
+                        st.write(f"🧑‍💼 **Account Manager:** {lead.get('responsible_name', 'Unknown')}")
+                        st.write(f"🏷️ **Opportunity Name:** {lead.get('opportunity_name', 'Unknown')}")
+                        st.write(f"🏛️ **Pillar:** {lead.get('pillar', 'Unknown')}")
+                        st.write(f"🧩 **Solution:** {lead.get('solution', 'Unknown')}")
+                        st.write(f"🛠️ **Service:** {lead.get('service', 'Unknown')}")
+                        st.write(f"🏷️ **Brand:** {lead.get('brand', 'Unknown')}")
+                        st.write(f"📡 **Channel:** {lead.get('channel', 'Unknown')}")
+                        st.write(f"🏢 **Company:** {lead.get('company_name', 'Unknown')}")
+                        st.write(f"🏭 **Vertical Industry:** {lead.get('vertical_industry', 'Unknown')}")
+                        st.write(f"💰 **Cost:** {lead.get('cost', 0)}")
+                        st.write(f"📝 **Notes:** {lead.get('notes', 'No notes available')}")
+                        st.write(f"📅 **Created At:** {lead.get('created_at', 'Unknown')}")
+                        st.write(f"⏰ **Updated At:** {lead.get('updated_at', 'Unknown')}")
 
                     else:
                         st.warning("Tidak ada lead ditemukan dengan UUID tersebut.")
@@ -432,14 +430,11 @@ with tab3:
             # editable fields
             notes = st.text_area("Catatan (Notes)", value=lead.get("Notes", ""), height=100, key="update_notes")
             cost = st.number_input("Biaya (Cost)", value=lead.get("Cost", 0), min_value=0, step=10000, key="update_cost")
-            stage = st.selectbox("Tahap (Stage)", ["Open", "Deal Won", "Deal Lost"], index=["Open", "Deal Won", "Deal Lost"].index(lead.get("Stage", "Open")), key="update_stage")
             submit_button = st.form_submit_button("Update Lead")
             if submit_button:
                 update_data = {
-                                "ID": opportunity_id,
                                 "Notes": notes,
                                 "Cost": cost,
-                                "Stage": stage
                             }
 
                 with st.spinner("Memperbarui lead..."):
@@ -448,4 +443,3 @@ with tab3:
                         st.success(update_response.get("message"))
                     else:
                         st.error(update_response.get("message", "Gagal memperbarui lead."))
-
