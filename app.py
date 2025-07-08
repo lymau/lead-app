@@ -301,6 +301,7 @@ with tab3:
         "Presales Account Manager",
         "Sales Group",
         "Sales Name",
+        "Opportunity Name",
         "Pillar",
         "Solution",
         "Service",
@@ -323,6 +324,9 @@ with tab3:
     elif search_by_option == "Sales Name":
         sales_name_keywords = [x.get("SalesName", "Unknown") for x in get_master('getSalesGroups')]
         search_query = st.selectbox("Select Sales Name", sales_name_keywords, key="search_query")
+    elif search_by_option == "Opportunity Name":
+        opportunity_name_keywords = [x.get("Desc", "Unknown") for x in get_master('getOpportunities')]
+        search_query = st.selectbox("Select Opportunity Name", opportunity_name_keywords, key="search_query")
     elif search_by_option == "Pillar":
         pillar_keywords = get_pillars()
         search_query = st.selectbox("Select Pillar", pillar_keywords, key="search_query")
@@ -359,6 +363,8 @@ with tab3:
                 search_params["salesgroup_id"] = search_query
             elif search_by_option == "Sales Name":
                 search_params["sales_name"] = search_query
+            elif search_by_option == "Opportunity Name":
+                search_params["opportunity_name"] = search_query
             elif search_by_option == "Pillar":
                 search_params["pillar"] = search_query
             elif search_by_option == "Solution":
