@@ -2,6 +2,9 @@ import streamlit as st
 import requests
 import json
 import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
+import numpy as np
 
 APPS_SCRIPT_API_URL = st.secrets['api_url']
 
@@ -10,6 +13,27 @@ st.set_page_config(
     page_icon=":clipboard:",
     initial_sidebar_state="expanded"
 )
+
+# Inisialisasi session state untuk mengingat apakah notifikasi sudah ditutup
+if 'update_dismissed' not in st.session_state:
+    st.session_state.update_dismissed = False
+
+# Tampilkan notifikasi hanya jika belum ditutup
+if not st.session_state.update_dismissed:
+    # Gunakan st.info atau st.success untuk tampilan yang menarik
+    with st.container(border=True):
+        st.subheader("🚀 Update Terbaru Aplikasi! (v1.1)")
+        st.markdown("""
+        - **Fitur Notifikasi Email:** Sekarang Anda bisa menandai beberapa email untuk notifikasi otomatis saat opportunity baru ditambahkan.
+        - **Info Kalkulasi Biaya:** Ditambahkan catatan kurs Rupiah dan diskon khusus untuk brand Cisco di bawah kolom 'Cost'.
+        - Perbaikan performa pada halaman pencarian data.
+        """)
+        
+        # Buat tombol untuk menutup notifikasi
+        if st.button("Tutup Pemberitahuan Ini", key="dismiss_update"):
+            st.session_state.update_dismissed = True
+            st.rerun() # Jalankan ulang script agar notifikasi langsung hilang
+    st.markdown("---") # Garis pemisah
 
 # ==============================================================================
 # GET ALL MASTER DATA
@@ -193,6 +217,34 @@ def get_single_lead(search_params):
         st.error(f"Error parsing response JSON: {e}")
         return {"status": 500, "message": f"JSON Decode Error: {e}"}
 
+def send_notification_email(email_data):
+    """
+    Mengirimkan notifikasi email melalui API Apps Script.
+
+    Args:
+        email_data (dict): Kamus berisi data email (misal: {'recipients': ['a@b.com'], 'subject': 'sub', 'body': 'bod'}).
+                           'recipients', 'subject', dan 'body' wajib ada.
+
+    Returns:
+        dict: Respon JSON dari API.
+    """
+    if APPS_SCRIPT_API_URL == "GANTI_DENGAN_URL_WEB_APP_ANDA_DI_SINI":
+        st.error("Harap perbarui APPS_SCRIPT_API_URL dengan URL Web App Anda!")
+        return {"status": 500, "message": "Konfigurasi URL API belum lengkap."}
+
+    url = f"{APPS_SCRIPT_API_URL}?action=sendEmail"
+    headers = {"Content-Type": "application/json"}
+    try:
+        response = requests.post(url, data=json.dumps(email_data), headers=headers)
+        response.raise_for_status()  # Memunculkan HTTPError untuk status kode 4xx/5xx
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error saat mengirim notifikasi: {e}")
+        return {"status": 500, "message": f"Request Error: {e}"}
+    except json.JSONDecodeError as e:
+        st.error(f"Error parsing response JSON: {e}")
+        return {"status": 500, "message": f"JSON Decode Error: {e}"}
+
 # ==============================================================================
 # ANTARMUKA STREAMLIT
 # ==============================================================================
@@ -216,7 +268,13 @@ with tab1:
 
     opportunity_name = st.selectbox("Opportunity Name", get_master('getOpportunities'), format_func=lambda x: x.get("Desc", "Unknown"), 
                                     key="opportunity_name", accept_new_options=True, index=None, placeholder="Choose or enter a new opportunity name")
+    
     start_date = st.date_input("Start Date", key="start_date")
+    email = st.text_input(
+    "Tag Email for Push Notification",
+    placeholder="Krisa@sisindokom.com, Kurniawan@sisindokom.com",
+    key="email")
+    st.info("**Tips:** Untuk mengirim notifikasi ke beberapa email, pisahkan setiap alamat dengan koma.\n\n*Contoh: Krisa@sisindokom.com, Kurniawan@sisindokom.com*")
 
     pillar = st.selectbox("Choose Pillar", get_pillars(), key="pillar")
     solution = st.selectbox("Choose Solution", get_solutions(pillar), key="solution")
@@ -234,7 +292,16 @@ with tab1:
         vertical_industry = st.selectbox("Choose Vertical Industry", pd.DataFrame(get_master('getCompanies'))["Vertical Industry"].unique().tolist(), key="vertical_industry")
 
     cost = st.number_input("Cost", min_value=0, step=10000, key="cost")
+    if brand_name:
+    # Siapkan pesan dasar
+        note_message = "Info: Tolong ubah ke dalam kurs rupiah (Rp 16.500)."
 
+    # Jika brand yang dipilih adalah "Cisco", tambahkan pesan tambahan
+    if brand_name.get("Brand") == "Cisco":
+        note_message += " Khusus untuk Cisco, kalikan dengan discounted price 50% terlebih dahulu baru dikalikan dengan kurs Rupiah."
+    
+    # Tampilkan pesan menggunakan st.info()
+    st.info(note_message)
     is_via_distributor = st.radio("Is it via distributor?", ["Yes", "No"], key="is_via_distributor")
     if is_via_distributor == "No":
         distributor_name = "Not via distributor"
@@ -253,6 +320,7 @@ with tab1:
                 "sales_name": sales_name,
                 "responsible_name": responsible_name.get("Responsible", ""),
                 "opportunity_name": opportunity_name.get("Desc", "") if isinstance(opportunity_name, dict) else opportunity_name,
+                "email": email,
                 "start_date": start_date.strftime("%Y-%m-%d"),
                 "distributor_name": distributor_name.get("Distributor", "") if isinstance(distributor_name, dict) else distributor_name,
                 "pillar": pillar,
@@ -270,6 +338,37 @@ with tab1:
                 response = add_lead(data)
                 if response and response.get("status") == 200:
                     st.success(response.get("message"))
+                    # Push notification to tagged email
+                    # Cek apakah kolom email diisi oleh pengguna
+                    if email:
+                # Ambil data penting dari respons 'add_lead' untuk isi email
+                        new_data = response.get("data", {})
+                        new_opp_name = new_data.get("opportunity_name", "N/A")
+                        new_opp_id = new_data.get("opportunity_id", "N/A") # Pastikan backend mengembalikan 'opportunity_id'
+                
+                # Buat daftar email, bersihkan dari spasi, dan filter jika ada entri kosong
+                        list_of_emails = [addr.strip() for addr in email.split(',') if addr.strip()]
+
+                    if list_of_emails:
+                    # Siapkan konten email
+                        email_subject = f"New Opportunity Added: {new_opp_name}"
+                        email_body = f"'{new_opp_name}' dengan Opportunity ID '{new_opp_id}' telah ditambahkan, mohon follow up!"
+                    
+                        email_data = {
+                        "recipients": list_of_emails,
+                        "subject": email_subject,
+                        "body": email_body
+                    }
+
+                    # Kirim notifikasi email
+                        with st.spinner(f"Sending notification to {len(list_of_emails)} email(s)..."):
+                            email_response = send_notification_email(email_data) # Panggil fungsi notifikasi
+                            if email_response and email_response.get("status") == 200:
+                                st.success(email_response.get("message"))
+                            else:
+                                st.error(email_response.get("message", "Failed to send notification."))
+            
+            # ▲▲▲ IMPLEMENTASI PUSH NOTIFICATION SELESAI ▲▲▲
                     # get the uuid of the newly added lead
                     st.info(f"Save UID for update: {response.get('data')['uid']}")
                 else:
@@ -429,7 +528,8 @@ with tab3:
                         st.warning("No opportunity found with the given UID.")
                 else:
                     st.error(response.get("message", "Failed to retrieve opportunity data."))
-                    st.json(response)   
+                    st.json(response)
+                    
         with st.form(key="update_lead_form"):
             # editable fields
             notes = st.text_area("Notes", value=lead.get("Notes", ""), height=100, key="update_notes")
@@ -448,3 +548,4 @@ with tab3:
                         st.success(update_response.get("message"))
                     else:
                         st.error(update_response.get("message", "Failed to update opportunity."))
+        st.markdown("---")
