@@ -2,8 +2,6 @@ import streamlit as st
 import requests
 import json
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter
 import numpy as np
 
 APPS_SCRIPT_API_URL = st.secrets['api_url']
@@ -355,10 +353,10 @@ with tab1:
                         email_body = f"'{new_opp_name}' dengan Opportunity ID '{new_opp_id}' telah ditambahkan, mohon follow up!"
                     
                         email_data = {
-                        "recipients": list_of_emails,
-                        "subject": email_subject,
-                        "body": email_body
-                    }
+                            "recipients": list_of_emails,
+                            "subject": email_subject,
+                            "body": email_body
+                        }
 
                     # Kirim notifikasi email
                         with st.spinner(f"Sending notification to {len(list_of_emails)} email(s)..."):
@@ -371,6 +369,7 @@ with tab1:
             # ▲▲▲ IMPLEMENTASI PUSH NOTIFICATION SELESAI ▲▲▲
                     # get the uuid of the newly added lead
                     st.info(f"Save UID for update: {response.get('data')['uid']}")
+                    st.write(data)
                 else:
                     st.error(response.get("message", "Failed to add new opportunity."))
         else:
