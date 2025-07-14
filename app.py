@@ -100,6 +100,10 @@ def get_sales_name_by_sales_group(sales_group):
     sales_name = df[df['SalesGroup'] == sales_group]['SalesName'].unique().tolist()
     return sales_name
 
+def get_activity_log():
+    """Mengambil semua data log aktivitas dari API Apps Script."""
+    # Kita bisa gunakan ulang fungsi get_master karena polanya sama
+    return get_master('getActivityLog')
 
 # ==============================================================================
 # FUNGSI UNTUK BERINTERAKSI DENGAN API
@@ -251,7 +255,7 @@ st.title("Presales App - SISINDOKOM")
 st.markdown("---")
 
 # Tab navigasi
-tab1, tab2, tab3, tab4 = st.tabs(["Add Opportunity", "View Opportunities", "Search Opportunity", "Update Opportunity"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Add Opportunity", "View Opportunities", "Search Opportunity", "Update Opportunity", "Activity Log"])
 
 with tab1:
     st.header("Add New Opportunity")
@@ -547,4 +551,60 @@ with tab3:
                         st.success(update_response.get("message"))
                     else:
                         st.error(update_response.get("message", "Failed to update opportunity."))
-        st.markdown("---")
+
+with tab5:
+    st.header("📜 Activity Log")
+    st.markdown("Mencatat semua aktivitas pembuatan dan pembaruan opportunity.")
+    if st.button("🔄 Refresh Log"):
+        # Membersihkan cache agar data log diambil ulang
+        st.cache_data.clear() # <-- FIX: Menggunakan st.cache_data.clear() untuk membersihkan semua cache
+        st.success("Log berhasil di-refresh!")
+        st.rerun()
+
+    try:
+        with st.spinner("Memuat log aktivitas..."):
+            log_data = get_activity_log() # Fungsi ini langsung mengembalikan list data
+
+        # FIX: Langsung periksa apakah list log_data memiliki isi
+        if log_data:
+            df_log = pd.DataFrame(log_data)
+            
+            # FIX: Sesuaikan nama kolom menjadi huruf kecil 'timestamp'
+            if 'timestamp' in df_log.columns:
+                # Konversi Timestamp ke format yang bisa dibaca dan diurutkan
+                df_log['timestamp'] = pd.to_datetime(df_log['timestamp'])
+                df_log.sort_values(by="timestamp", ascending=False, inplace=True)
+            else:
+                st.warning("Peringatan: Kolom 'timestamp' tidak ditemukan di data log.")
+
+            st.info(f"Total {len(df_log)} aktivitas tercatat.")
+
+            # --- Fitur Filter ---
+            st.markdown("---")
+            # Dapatkan daftar Opportunity ID unik untuk filter
+            # FIX: Sesuaikan nama kolom menjadi huruf kecil 'opportunity_id'
+            if 'opportunity_id' in df_log.columns and not df_log['opportunity_id'].isnull().all():
+                unique_opp_ids = df_log['opportunity_id'].dropna().unique()
+                
+                selected_id = st.selectbox(
+                    "Filter berdasarkan Opportunity ID:",
+                    options=["All"] + list(unique_opp_ids),
+                    index=0
+                )
+
+                # Tampilkan dataframe sesuai filter
+                if selected_id == "All":
+                    st.dataframe(df_log)
+                else:
+                    filtered_df = df_log[df_log['opportunity_id'] == selected_id]
+                    st.dataframe(filtered_df)
+            else:
+                st.write("Data log tersedia, namun tidak ada Opportunity ID untuk difilter.")
+                st.dataframe(df_log)
+
+        else:
+            st.info("Belum ada aktivitas yang tercatat atau terjadi kegagalan saat memuat data.")
+
+    except Exception as e:
+        st.error(f"Terjadi error saat menampilkan log: {e}")
+# ▲▲▲ AKHIR KODE TAB BARU ▲▲▲
