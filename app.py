@@ -24,7 +24,7 @@ if not st.session_state.update_dismissed:
         st.markdown("""
         - **Fitur Notifikasi Email:** Sekarang Anda bisa menandai beberapa email untuk notifikasi otomatis saat opportunity baru ditambahkan.
         - **Info Kalkulasi Biaya:** Ditambahkan catatan kurs Rupiah dan diskon khusus untuk brand Cisco di bawah kolom 'Cost'.
-        - Perbaikan performa pada halaman pencarian data.
+        - **Fitur Baru: Edit Data Entri!** Kini tersedia tab "Edit Opportunity" untuk memperbaiki kesalahan input data secara lengkap.
         """)
         
         # Buat tombol untuk menutup notifikasi
@@ -166,6 +166,30 @@ def update_lead(lead_data):
         st.error(f"Error parsing response JSON: {e}")
         return {"status": 500, "message": f"JSON Decode Error: {e}"}
 
+# ▼▼▼ FUNGSI UNTUK UPDATE DATA LENGKAP ▼▼▼
+def update_full_opportunity(lead_data):
+    """Mengirimkan data lengkap untuk diperbarui melalui API."""
+    url = f"{APPS_SCRIPT_API_URL}?action=updateFullOpportunity"
+    headers = {"Content-Type": "application/json"}
+    try:
+        response = requests.post(url, data=json.dumps(lead_data), headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error saat memperbarui data: {e}")
+        return None
+# ▲▲▲ AKHIR FUNGSI BARU ▲▲▲
+
+def clean_data_for_display(data):
+    """Membersihkan data sebelum ditampilkan di st.dataframe untuk mencegah error."""
+    if not data:
+        return pd.DataFrame()
+    df = pd.DataFrame(data)
+    if 'cost' in df.columns:
+        df['cost'] = pd.to_numeric(df['cost'], errors='coerce').fillna(0).astype(int)
+    if 'selling_price' in df.columns:
+        df['selling_price'] = pd.to_numeric(df['selling_price'], errors='coerce').fillna(0).astype(int)
+    return df
 
 def get_all_leads():
     """
@@ -255,7 +279,7 @@ st.title("Presales App - SISINDOKOM")
 st.markdown("---")
 
 # Tab navigasi
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Add Opportunity", "View Opportunities", "Search Opportunity", "Update Opportunity", "Activity Log"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Add Opportunity", "View Opportunities", "Search Opportunity", "Update Opportunity", "Edit Opportunity"])
 
 with tab1:
     st.header("Add New Opportunity")
@@ -270,7 +294,7 @@ with tab1:
 
     opportunity_name = st.selectbox("Opportunity Name", get_master('getOpportunities'), format_func=lambda x: x.get("Desc", "Unknown"), 
                                     key="opportunity_name", accept_new_options=True, index=None, placeholder="Choose or enter a new opportunity name")
-    
+    st.info("Perhatian: Sebelum melanjutkan, harap verifikasi bahwa opportunity ini merupakan entri baru dan belum tercatat pada kuartal sebelumnya (Q1/Q2).")
     start_date = st.date_input("Start Date", key="start_date")
     email = st.text_input(
     "Tag Email for Push Notification",
@@ -343,32 +367,30 @@ with tab1:
                     # Push notification to tagged email
                     # Cek apakah kolom email diisi oleh pengguna
                     if email:
-                # Ambil data penting dari respons 'add_lead' untuk isi email
-                        new_data = response.get("data", {})
-                        new_opp_name = new_data.get("opportunity_name", "N/A")
-                        new_opp_id = new_data.get("opportunity_id", "N/A") # Pastikan backend mengembalikan 'opportunity_id'
-                
-                # Buat daftar email, bersihkan dari spasi, dan filter jika ada entri kosong
                         list_of_emails = [addr.strip() for addr in email.split(',') if addr.strip()]
+                        if list_of_emails:
+                # Ambil data penting dari respons 'add_lead' untuk isi email
+                            new_data = response.get("data", {})
+                            new_opp_name = new_data.get("opportunity_name", "N/A")
+                            new_opp_id = new_data.get("opportunity_id", "N/A")
 
-                    if list_of_emails:
                     # Siapkan konten email
-                        email_subject = f"New Opportunity Added: {new_opp_name}"
-                        email_body = f"'{new_opp_name}' dengan Opportunity ID '{new_opp_id}' telah ditambahkan, mohon follow up!"
-                    
-                        email_data = {
+                            email_subject = f"New Opportunity Added: {new_opp_name}"
+                            email_body = f"'{new_opp_name}' dengan Opportunity ID '{new_opp_id}' telah ditambahkan, mohon follow up!"
+            
+                            email_data = {
                             "recipients": list_of_emails,
                             "subject": email_subject,
                             "body": email_body
                         }
 
                     # Kirim notifikasi email
-                        with st.spinner(f"Sending notification to {len(list_of_emails)} email(s)..."):
-                            email_response = send_notification_email(email_data) # Panggil fungsi notifikasi
-                            if email_response and email_response.get("status") == 200:
-                                st.success(email_response.get("message"))
-                            else:
-                                st.error(email_response.get("message", "Failed to send notification."))
+                            with st.spinner(f"Sending notification to {len(list_of_emails)} email(s)..."):
+                                email_response = send_notification_email(email_data) # Panggil fungsi notifikasi
+                                if email_response and email_response.get("status") == 200:
+                                    st.success(email_response.get("message"))
+                                else:
+                                    st.error(email_response.get("message", "Failed to send notification."))
             
             # ▲▲▲ IMPLEMENTASI PUSH NOTIFICATION SELESAI ▲▲▲
                     # get the uuid of the newly added lead
@@ -389,7 +411,8 @@ with tab2:
                 leads_data = response.get("data")
                 if leads_data:
                     st.write(f"Found {len(leads_data)} opportunities.")
-                    st.dataframe(leads_data)
+                    cleaned_df = clean_data_for_display(leads_data)
+                    st.dataframe(cleaned_df)
                 else:
                     st.info("No opportunities found.")
             else:
@@ -490,7 +513,8 @@ with tab3:
                     found_leads = response.get("data")
                     if found_leads:
                         st.success(f"Found {len(found_leads)} opportunity(s).")
-                        st.dataframe(found_leads)
+                        cleaned_df = clean_data_for_display(found_leads)
+                        st.dataframe(cleaned_df)
                     else:
                         st.info("No opportunity found with the given criteria.")
                 else:
@@ -551,60 +575,142 @@ with tab3:
                         st.success(update_response.get("message"))
                     else:
                         st.error(update_response.get("message", "Failed to update opportunity."))
-
+                        
 with tab5:
-    st.header("📜 Activity Log")
-    st.markdown("Mencatat semua aktivitas pembuatan dan pembaruan opportunity.")
-    if st.button("🔄 Refresh Log"):
-        # Membersihkan cache agar data log diambil ulang
-        st.cache_data.clear() # <-- FIX: Menggunakan st.cache_data.clear() untuk membersihkan semua cache
-        st.success("Log berhasil di-refresh!")
-        st.rerun()
+    st.header("✏️ Edit Data Entry (Error Correction)")
+    st.warning("Use this page for correcting input.")
 
-    try:
-        with st.spinner("Memuat log aktivitas..."):
-            log_data = get_activity_log() # Fungsi ini langsung mengembalikan list data
+    if 'lead_to_edit' not in st.session_state:
+        st.session_state.lead_to_edit = None
 
-        # FIX: Langsung periksa apakah list log_data memiliki isi
-        if log_data:
-            df_log = pd.DataFrame(log_data)
-            
-            # FIX: Sesuaikan nama kolom menjadi huruf kecil 'timestamp'
-            if 'timestamp' in df_log.columns:
-                # Konversi Timestamp ke format yang bisa dibaca dan diurutkan
-                df_log['timestamp'] = pd.to_datetime(df_log['timestamp'])
-                df_log.sort_values(by="timestamp", ascending=False, inplace=True)
-            else:
-                st.warning("Peringatan: Kolom 'timestamp' tidak ditemukan di data log.")
-
-            st.info(f"Total {len(df_log)} aktivitas tercatat.")
-
-            # --- Fitur Filter ---
-            st.markdown("---")
-            # Dapatkan daftar Opportunity ID unik untuk filter
-            # FIX: Sesuaikan nama kolom menjadi huruf kecil 'opportunity_id'
-            if 'opportunity_id' in df_log.columns and not df_log['opportunity_id'].isnull().all():
-                unique_opp_ids = df_log['opportunity_id'].dropna().unique()
-                
-                selected_id = st.selectbox(
-                    "Filter berdasarkan Opportunity ID:",
-                    options=["All"] + list(unique_opp_ids),
-                    index=0
-                )
-
-                # Tampilkan dataframe sesuai filter
-                if selected_id == "All":
-                    st.dataframe(df_log)
+    # --- LANGKAH 1: CARI DATA ---
+    uid_to_find = st.text_input("Enter the UID of the opportunity to be corrected:", key="uid_finder_edit")
+    if st.button("Find Data to Edit"):
+        st.session_state.lead_to_edit = None
+        if uid_to_find:
+            with st.spinner("Fetching data..."):
+                response = get_single_lead({"uid": uid_to_find})
+                if response and response.get("status") == 200:
+                    lead_data = response.get("data")
+                    if lead_data:
+                        st.session_state.lead_to_edit = lead_data[0]
+                        st.success("Data found. Please edit the form below.")
+                    else:
+                        st.error("UID not found. Please check the UID and try again.")
                 else:
-                    filtered_df = df_log[df_log['opportunity_id'] == selected_id]
-                    st.dataframe(filtered_df)
-            else:
-                st.write("Data log tersedia, namun tidak ada Opportunity ID untuk difilter.")
-                st.dataframe(df_log)
-
+                    st.error("Failed to retrieve data from the database. Please try again.")
         else:
-            st.info("Belum ada aktivitas yang tercatat atau terjadi kegagalan saat memuat data.")
+            st.warning("Please enter the UID.")
 
-    except Exception as e:
-        st.error(f"Terjadi error saat menampilkan log: {e}")
-# ▲▲▲ AKHIR KODE TAB BARU ▲▲▲
+    # --- LANGKAH 2: TAMPILKAN FORM EDIT JIKA DATA DITEMUKAN ---
+    if st.session_state.lead_to_edit:
+        lead = st.session_state.lead_to_edit
+        st.markdown("---")
+        st.subheader(f"Step 2: Edit Data for '{lead.get('opportunity_name', '')}'")
+
+        # NOTE: Form dihapus untuk memungkinkan cascading dropdown interaktif
+        col1, col2 = st.columns(2)
+        with col1:
+            all_sales_groups = get_sales_groups()
+            all_responsibles = get_master('getResponsibles')
+            all_pillars = get_pillars()
+            all_brands = get_master('getBrands')
+            def get_index(data_list, value, key=None):
+                try:
+                    if key: return [item.get(key) for item in data_list].index(value)
+                    else: return data_list.index(value)
+                except (ValueError, TypeError): return 0
+            
+            edited_salesgroup = st.selectbox("Sales Group", all_sales_groups, index=get_index(all_sales_groups, lead.get('salesgroup_id')), key="edit_salesgroup")
+            sales_name_options = get_sales_name_by_sales_group(st.session_state.edit_salesgroup)
+            edited_sales_name = st.selectbox("Sales Name", sales_name_options, index=get_index(sales_name_options, lead.get('sales_name')), key="edit_salesname")
+            
+            edited_responsible = st.selectbox("Presales Account Manager", all_responsibles, index=get_index(all_responsibles, lead.get('responsible_name'), 'Responsible'), format_func=lambda x: x.get("Responsible", ""), key="edit_responsible")
+            
+            edited_pillar = st.selectbox("Pillar", all_pillars, index=get_index(all_pillars, lead.get('pillar')), key="edit_pillar")
+            solution_options = get_solutions(st.session_state.edit_pillar)
+            edited_solution = st.selectbox("Solution", solution_options, index=get_index(solution_options, lead.get('solution')), key="edit_solution")
+        
+        with col2:
+            all_companies_data = get_master('getCompanies')
+            all_distributors = get_master('getDistributors')
+            companies_df = pd.DataFrame(all_companies_data)
+            
+            service_options = get_services(st.session_state.edit_solution)
+            edited_service = st.selectbox("Service", service_options, index=get_index(service_options, lead.get('service')), key="edit_service")
+
+            edited_brand = st.selectbox("Brand", all_brands, index=get_index(all_brands, lead.get('brand'), 'Brand'), format_func=lambda x: x.get("Brand", ""), key="edit_brand")
+            
+            edited_company = st.selectbox(
+                "Company", 
+                all_companies_data, 
+                index=get_index(all_companies_data, lead.get('company_name'), 'Company'), 
+                format_func=lambda x: x.get("Company", ""), 
+                key="edit_company"
+            )
+
+            derived_vertical_industry = ""
+            if st.session_state.get('edit_company') and not companies_df.empty and 'Company' in companies_df.columns and 'Vertical Industry' in companies_df.columns:
+                selected_company_name = st.session_state.edit_company.get('Company')
+                filtered_industry = companies_df[companies_df['Company'] == selected_company_name]['Vertical Industry']
+                if not filtered_industry.empty:
+                    derived_vertical_industry = filtered_industry.iloc[0]
+
+            st.text_input(
+                "Vertical Industry", 
+                value=derived_vertical_industry, 
+                key="edit_vertical",
+                disabled=True
+            )
+            
+            # --- LOGIKA BARU UNTUK DISTRIBUTOR ---
+            is_via_distributor_default = 1 if lead.get('distributor_name') == "Not via distributor" else 0
+            is_via_distributor_choice = st.radio(
+                "Is it via distributor?",
+                ("Yes", "No"),
+                index=is_via_distributor_default,
+                key="edit_is_via_distributor"
+            )
+
+            if is_via_distributor_choice == "Yes":
+                edited_distributor = st.selectbox(
+                    "Distributor",
+                    all_distributors,
+                    index=get_index(all_distributors, lead.get('distributor_name'), 'Distributor'),
+                    format_func=lambda x: x.get("Distributor", ""),
+                    key="edit_distributor_select"
+                )
+            else:
+                edited_distributor = "Not via distributor"
+            # --- AKHIR LOGIKA BARU ---
+
+        if st.button("Save Changes"):
+            update_payload = {
+                "uid": lead.get('uid'),
+                "salesgroup_id": st.session_state.edit_salesgroup,
+                "sales_name": st.session_state.edit_salesname,
+                "responsible_name": st.session_state.edit_responsible.get('Responsible', ''),
+                "pillar": st.session_state.edit_pillar,
+                "solution": st.session_state.edit_solution,
+                "service": st.session_state.edit_service,
+                "brand": st.session_state.edit_brand.get('Brand', ''),
+                "company_name": st.session_state.edit_company.get('Company', ''),
+                "vertical_industry": st.session_state.edit_vertical,
+                "distributor_name": edited_distributor.get('Distributor', '') if isinstance(edited_distributor, dict) else edited_distributor
+            }
+            
+            with st.spinner(f"Updating opportunity with UID: {lead.get('uid')}..."):
+                update_response = update_full_opportunity(update_payload)
+                if update_response and update_response.get("status") == 200:
+                    st.success(update_response.get("message"))
+                    
+                    updated_data = update_response.get("data", {})
+                    new_uid = updated_data.get("uid")
+                    if new_uid != lead.get('uid'):
+                        st.info(f"IMPORTANT: The UID has been updated. The new UID is: {new_uid}")
+                    
+                    st.session_state.lead_to_edit = None
+                    st.rerun()
+                else:
+                    error_message = update_response.get("message", "Failed to update opportunity.") if update_response else "Failed to update opportunity."
+                    st.error(error_message)
