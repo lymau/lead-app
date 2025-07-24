@@ -37,7 +37,7 @@ if not st.session_state.update_dismissed:
 # GET ALL MASTER DATA
 # ==============================================================================
 
-@st.cache_data(ttl=300) # Data akan di-cache selama 1 jam (3600 detik)
+@st.cache_data(ttl=450) # Data akan di-cache selama 1 jam (3600 detik)
 def get_master(action: str):
     """
     Mengambil semua data dari sheet 'OBSERVERS' dari API Apps Script.
