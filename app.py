@@ -20,11 +20,9 @@ if 'update_dismissed' not in st.session_state:
 if not st.session_state.update_dismissed:
     # Gunakan st.info atau st.success untuk tampilan yang menarik
     with st.container(border=True):
-        st.subheader("🚀 Update Terbaru Aplikasi! (v1.1)")
+        st.subheader("🚀 Update Terbaru Aplikasi! (v1.2)")
         st.markdown("""
-        - **Fitur Notifikasi Email:** Sekarang Anda bisa menandai beberapa email untuk notifikasi otomatis saat opportunity baru ditambahkan.
-        - **Info Kalkulasi Biaya:** Ditambahkan catatan kurs Rupiah dan diskon khusus untuk brand Cisco di bawah kolom 'Cost'.
-        - **Fitur Baru: Edit Data Entri!** Kini tersedia tab "Edit Opportunity" untuk memperbaiki kesalahan input data secara lengkap.
+        **Pembaruan Besar di Tab "Add Opportunity"!** Formulir kini mendukung entri multi-solusi dalam satu kali submit.
         """)
         
         # Buat tombol untuk menutup notifikasi
@@ -242,6 +240,18 @@ def get_single_lead(search_params):
     except json.JSONDecodeError as e:
         st.error(f"Error parsing response JSON: {e}")
         return {"status": 500, "message": f"JSON Decode Error: {e}"}
+    
+def add_multi_line_opportunity(payload):
+    """Mengirimkan data opportunity dengan beberapa product line."""
+    url = f"{APPS_SCRIPT_API_URL}?action=addMultiLineOpportunity"
+    headers = {"Content-Type": "application/json"}
+    try:
+        response = requests.post(url, data=json.dumps(payload), headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except (requests.exceptions.RequestException, json.JSONDecodeError) as e:
+        st.error(f"Error saat menambahkan opportunity: {e}")
+        return None
 
 def send_notification_email(email_data):
     """
@@ -281,125 +291,201 @@ st.markdown("---")
 # Tab navigasi
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Add Opportunity", "View Opportunities", "Search Opportunity", "Update Opportunity", "Edit Opportunity"])
 
+# Inisialisasi session state untuk menyimpan product lines
+if 'product_lines' not in st.session_state:
+    st.session_state.product_lines = [{"id": 0}]
+if 'submission_message' not in st.session_state:
+    st.session_state.submission_message = None
+if 'new_uids' not in st.session_state:
+    st.session_state.new_uids = None
+if 'edit_submission_message' not in st.session_state:
+    st.session_state.edit_submission_message = None
+if 'edit_new_uid' not in st.session_state:
+    st.session_state.edit_new_uid = None
+
 with tab1:
-    st.header("Add New Opportunity")
+    st.header("Add New Opportunity (Multi-Solution)")
+    st.info("Fill out the main details once, then add one or more solutions below.")
 
-    presales_name = st.selectbox("Inputter", get_master('getPresales'), format_func=lambda x: x.get("PresalesName", "Unknown"), key="presales_name")
-
-    salesgroup_id = st.selectbox("Choose Sales Group", get_sales_groups(), key="salesgroup_id")
-    sales_name = st.selectbox("Choose Sales Name", get_sales_name_by_sales_group(salesgroup_id), format_func=lambda x: x, key="sales_name")
-
-    # observer_name = st.selectbox("Pilih Observer", get_master('getObservers'), format_func=lambda x: x.get("Observers", "Unknown"), key="observer_name")
-    responsible_name = st.selectbox("Choose Presales Account Manager", get_master('getResponsibles'), format_func=lambda x: x.get("Responsible", "Unknown"), key="responsible_name")
-
-    opportunity_name = st.selectbox("Opportunity Name", get_master('getOpportunities'), format_func=lambda x: x.get("Desc", "Unknown"), 
-                                    key="opportunity_name", accept_new_options=True, index=None, placeholder="Choose or enter a new opportunity name")
-    st.info("Perhatian: Sebelum melanjutkan, harap verifikasi bahwa opportunity ini merupakan entri baru dan belum tercatat pada kuartal sebelumnya (Q1/Q2).")
-    start_date = st.date_input("Start Date", key="start_date")
-    email = st.text_input(
-    "Tag Email for Push Notification",
-    placeholder="Krisa@sisindokom.com, Kurniawan@sisindokom.com",
-    key="email")
-    st.info("**Tips:** Untuk mengirim notifikasi ke beberapa email, pisahkan setiap alamat dengan koma.\n\n*Contoh: Krisa@sisindokom.com, Kurniawan@sisindokom.com*")
-
-    pillar = st.selectbox("Choose Pillar", get_pillars(), key="pillar")
-    solution = st.selectbox("Choose Solution", get_solutions(pillar), key="solution")
-    service = st.selectbox("Choose Service", get_services(solution), key="service")
-
-    brand_name = st.selectbox("Choose Brand", get_master('getBrands'), format_func=lambda x: x.get("Brand", "Unknown"), key="brand_name")
-    channel = st.selectbox("Choose Channel", get_channels(brand_name['Brand']), key="channel")
-
-    is_company_listed = st.radio("Is the company listed?", ["Yes", "No"], key="is_company_listed")
-    if is_company_listed == "Yes":
-        company_name = st.selectbox("Choose Company", get_master('getCompanies'), format_func=lambda x: x.get("Company", "Unknown"), key="company_name")
-        vertical_industry = st.selectbox("Choose Vertical Industry", pd.DataFrame(get_master('getCompanies'))[pd.DataFrame(get_master('getCompanies'))['Company'] == company_name['Company']]['Vertical Industry'].unique().tolist(), key="vertical_industry")
-    else:
-        company_name = st.text_input("Company Name (if not listed)", key="company_name")
-        vertical_industry = st.selectbox("Choose Vertical Industry", pd.DataFrame(get_master('getCompanies'))["Vertical Industry"].unique().tolist(), key="vertical_industry")
-
-    cost = st.number_input("Cost", min_value=0, step=10000, key="cost")
-    if brand_name:
-    # Siapkan pesan dasar
-        note_message = "Info: Tolong ubah ke dalam kurs rupiah (Rp 16.500)."
-
-    # Jika brand yang dipilih adalah "Cisco", tambahkan pesan tambahan
-    if brand_name.get("Brand") == "Cisco":
-        note_message += " Khusus untuk Cisco, kalikan dengan discounted price 50% terlebih dahulu baru dikalikan dengan kurs Rupiah."
+    # --- BAGIAN 1: DATA INDUK (PARENT DATA) ---
+    st.subheader("Step 1: Main Opportunity Details")
     
-    # Tampilkan pesan menggunakan st.info()
-    st.info(note_message)
-    is_via_distributor = st.radio("Is it via distributor?", ["Yes", "No"], key="is_via_distributor")
-    if is_via_distributor == "No":
-        distributor_name = "Not via distributor"
-    else:
-        distributor_name = st.selectbox("Choose Distributor", get_master('getDistributors'), format_func=lambda x: x.get("Distributor", "Unknown"), key="distributor_name")
+    parent_col1, parent_col2 = st.columns(2)
+    with parent_col1:
+        presales_name = st.selectbox("Inputter", get_master('getPresales'), format_func=lambda x: x.get("PresalesName", "Unknown"), key="parent_presales_name")
+        salesgroup_id = st.selectbox("Choose Sales Group", get_sales_groups(), key="parent_salesgroup_id")
+        sales_name = st.selectbox("Choose Sales Name", get_sales_name_by_sales_group(st.session_state.get("parent_salesgroup_id")), key="parent_sales_name")
 
-    notes = st.text_area("Notes", height=100, key="notes")
+    with parent_col2:
+        opportunity_name = st.selectbox("Opportunity Name", [opt.get("Desc") for opt in get_master('getOpportunities')], key="parent_opportunity_name", accept_new_options=True, index=None, placeholder="Choose or type new opportunity name")
+        st.warning("IMPORTANT: Check that this opportunity wasn't submitted in Q1/Q2 to prevent duplicate entries.")
+        start_date = st.date_input("Start Date", key="parent_start_date")
+        all_companies_data = get_master('getCompanies')
+        companies_df = pd.DataFrame(all_companies_data)
+        
+        is_company_listed = st.radio("Is the company listed?", ("Yes", "No"), key="parent_is_company_listed", horizontal=True)
 
-    submitted_add = st.button("Submit")
+        company_name_final = ""
+        vertical_industry_final = ""
 
-    if submitted_add:
-        if opportunity_name:
-            data = {
-                "presales_name": presales_name.get("PresalesName", ""),
-                "salesgroup_id": salesgroup_id,
-                "sales_name": sales_name,
-                "responsible_name": responsible_name.get("Responsible", ""),
-                "opportunity_name": opportunity_name.get("Desc", "") if isinstance(opportunity_name, dict) else opportunity_name,
-                "email": email,
-                "start_date": start_date.strftime("%Y-%m-%d"),
-                "distributor_name": distributor_name.get("Distributor", "") if isinstance(distributor_name, dict) else distributor_name,
-                "pillar": pillar,
-                "solution": solution,
-                "service": service,
-                "brand": brand_name.get("Brand", ""),
-                "channel": channel,
-                "company_name": company_name.get("Company", "") if isinstance(company_name, dict) else company_name,
-                "vertical_industry": vertical_industry.get("Vertical Industry", "") if isinstance(vertical_industry, dict) else vertical_industry,
-                "cost": cost,
-                "notes": notes
-            }
-
-            with st.spinner("Adding new lead..."):
-                response = add_lead(data)
-                if response and response.get("status") == 200:
-                    st.success(response.get("message"))
-                    # Push notification to tagged email
-                    # Cek apakah kolom email diisi oleh pengguna
-                    if email:
-                        list_of_emails = [addr.strip() for addr in email.split(',') if addr.strip()]
-                        if list_of_emails:
-                # Ambil data penting dari respons 'add_lead' untuk isi email
-                            new_data = response.get("data", {})
-                            new_opp_name = new_data.get("opportunity_name", "N/A")
-                            new_opp_id = new_data.get("opportunity_id", "N/A")
-
-                    # Siapkan konten email
-                            email_subject = f"New Opportunity Added: {new_opp_name}"
-                            email_body = f"'{new_opp_name}' dengan Opportunity ID '{new_opp_id}' telah ditambahkan, mohon follow up!"
+        if is_company_listed == "Yes":
+            company_name_obj = st.selectbox(
+                "Choose Company",
+                all_companies_data,
+                format_func=lambda x: x.get("Company", "Pilih Perusahaan"),
+                key="parent_company_select"
+            )
+            if company_name_obj:
+                company_name_final = company_name_obj.get("Company", "")
+                # Mencari vertical industry berdasarkan company yang dipilih
+                if not companies_df.empty and 'Company' in companies_df.columns and 'Vertical Industry' in companies_df.columns:
+                    filtered_industry = companies_df[companies_df['Company'] == company_name_final]['Vertical Industry']
+                    if not filtered_industry.empty:
+                        vertical_industry_final = filtered_industry.iloc[0]
+            st.text_input("Vertical Industry", value=vertical_industry_final, disabled=True, key="parent_vertical_industry_disabled")
+        
+        else: # Jika pilihan "No"
+            company_name_final = st.text_input("Company Name (if not listed)", key="parent_company_text_input")
             
-                            email_data = {
-                            "recipients": list_of_emails,
-                            "subject": email_subject,
-                            "body": email_body
-                        }
-
-                    # Kirim notifikasi email
-                            with st.spinner(f"Sending notification to {len(list_of_emails)} email(s)..."):
-                                email_response = send_notification_email(email_data) # Panggil fungsi notifikasi
-                                if email_response and email_response.get("status") == 200:
-                                    st.success(email_response.get("message"))
-                                else:
-                                    st.error(email_response.get("message", "Failed to send notification."))
+            vertical_industry_options = []
+            if not companies_df.empty and 'Vertical Industry' in companies_df.columns:
+                vertical_industry_options = sorted(companies_df['Vertical Industry'].unique().tolist())
             
-            # ▲▲▲ IMPLEMENTASI PUSH NOTIFICATION SELESAI ▲▲▲
-                    # get the uuid of the newly added lead
-                    st.info(f"Save UID for update: {response.get('data')['uid']}")
-                    st.write(data)
+            vertical_industry_final = st.selectbox(
+                "Choose Vertical Industry",
+                vertical_industry_options,
+                key="parent_vertical_industry_select"
+            )
+
+    # --- BAGIAN 2: PRODUCT LINES DINAMIS ---
+    st.markdown("---")
+    st.subheader("Step 2: Add Solutions")
+    for i, line in enumerate(st.session_state.product_lines):
+        with st.container(border=True):
+            cols = st.columns([0.9, 0.1])
+            cols[0].markdown(f"**Solution {i+1}**")
+            # Tombol hapus hanya muncul jika ada lebih dari 1 baris
+            if len(st.session_state.product_lines) > 1:
+                if cols[1].button("❌", key=f"remove_{line['id']}", help="Remove this line"):
+                    st.session_state.product_lines.pop(i)
+                    st.rerun()
+            
+            line['responsible_name'] = st.selectbox(
+                "Choose Presales Account Manager", 
+                get_master('getResponsibles'), 
+                format_func=lambda x: x.get("Responsible", "Unknown"), 
+                key=f"responsible_{line['id']}"
+            )
+
+            line_col1, line_col2 = st.columns(2)
+            with line_col1:
+                line['pillar'] = st.selectbox("Pillar", get_pillars(), key=f"pillar_{line['id']}")
+                solution_options = get_solutions(line['pillar'])
+                line['solution'] = st.selectbox("Solution", solution_options, key=f"solution_{line['id']}")
+                service_options = get_services(line['solution'])
+                line['service'] = st.selectbox("Service", service_options, key=f"service_{line['id']}")
+            
+            with line_col2:
+                brand_options = [b.get("Brand") for b in get_master('getBrands')]
+                line['brand'] = st.selectbox("Brand", brand_options, key=f"brand_{line['id']}")
+                channel_options = get_channels(line.get('brand'))
+                line['channel'] = st.selectbox("Channel", channel_options, key=f"channel_{line['id']}")
+                line['cost'] = st.number_input("Cost", min_value=0, step=10000, key=f"cost_{line['id']}")
+                note_message = "Note: All values must be in Indonesian Rupiah (IDR). (e.g., 1 USD = 16,500 IDR)."
+                if line.get("brand") == "Cisco":
+                    note_message += " For Cisco only: First, apply a 50% discount to the price, then multiply by the IDR exchange rate."
+                st.info(note_message)
+                is_via = st.radio("Via Distributor?", ("Yes", "No"), index=1, key=f"is_via_{line['id']}", horizontal=True)
+                if is_via == "Yes":
+                    dist_options = [d.get("Distributor") for d in get_master('getDistributors')]
+                    line['distributor_name'] = st.selectbox("Distributor", dist_options, key=f"dist_{line['id']}")
                 else:
-                    st.error(response.get("message", "Failed to add new opportunity."))
-        else:
-            st.warning("Opportunity name is required.")
+                    line['distributor_name'] = "Not via distributor"
+            
+            # Kolom Notes sekarang ada di dalam setiap product line
+            line['notes'] = st.text_area("Notes for this Solution", key=f"notes_{line['id']}", height=100)
+            st.info("""
+            * **If the brand is 'Others'**, please specify the brand name in the notes.
+            * **If a distributor is not listed**, please inform the admin to have it added.
+            * **For any other remarks**, please use this notes field.
+            """)
+    # Pastikan ada setidaknya satu product line
+    # Tombol untuk menambah baris baru
+    if st.button("➕ Add Another Solution"):
+        # Buat ID unik baru untuk key widget
+        new_id = max(line['id'] for line in st.session_state.product_lines) + 1 if st.session_state.product_lines else 0
+        st.session_state.product_lines.append({
+            "id": new_id
+        })
+        st.rerun()
+
+    # --- BAGIAN 3: SUBMIT ---
+    st.markdown("---")
+    st.subheader("Step 3: Submit Opportunity")
+    
+    # Kolom email notifikasi
+    final_email = st.text_input("Tag Email for Push Notification", placeholder="first_name.last_name@sisindokom.com", key="final_email")
+    st.info("**Tip: To send notifications to multiple emails, separate each address with a comma.**\n*Example: krisa@sisindokom.com, kurniawan@sisindokom.com*")
+    if st.button("Submit Opportunity and All Solutions", type="primary"):
+        # Kumpulkan data induk
+        parent_payload = {
+            "presales_name": presales_name.get("PresalesName", ""),
+            "salesgroup_id": salesgroup_id,
+            "sales_name": sales_name,
+            "opportunity_name": opportunity_name,
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "company_name": company_name_final,
+            "vertical_industry": vertical_industry_final
+        }
+
+        # Kumpulkan data product lines
+        lines_payload = []
+        for line in st.session_state.product_lines:
+            processed_line = line.copy()
+            # Ekstrak nama dari objek 'responsible_name'
+            responsible_obj = processed_line.get('responsible_name', {})
+            processed_line['responsible_name'] = responsible_obj.get('Responsible', '')
+            lines_payload.append(processed_line)
+
+        # Gabungkan menjadi payload akhir
+        final_payload = {
+            "parent_data": parent_payload,
+            "product_lines": lines_payload
+        }
+        
+        with st.spinner("Submitting all solutions..."):
+            response = add_multi_line_opportunity(final_payload)
+            if response and response.get("status") == 200:
+                st.session_state.submission_message = response.get("message")
+                created_data = response.get('data', [])
+                st.session_state.new_uids = [data.get('uid') for data in created_data]
+                
+                if final_email:
+                    list_of_emails = [addr.strip() for addr in final_email.split(',') if addr.strip()]
+                    if list_of_emails:
+                        opp_id = created_data[0].get('opportunity_id', 'N/A') if created_data else 'N/A'
+                        email_subject = f"New Multi-Solution Opportunity Added: {parent_payload['opportunity_name']}"
+                        email_body = f"A new opportunity '{parent_payload['opportunity_name']}' with Opportunity ID '{opp_id}' and {len(lines_payload)} solution(s) has been added. Please follow up."
+                        email_data = {"recipients": list_of_emails, "subject": email_subject, "body": email_body}
+                        send_notification_email(email_data)
+                        st.session_state.submission_message += f" | Email notification successfully sent to {len(list_of_emails)} recipient(s)."
+
+                # Reset form dan jalankan ulang untuk menampilkan pesan
+                st.session_state.product_lines = [{"id": 0}]
+                st.rerun()
+            else:
+                error_msg = response.get('message', 'Unknown error') if response else 'No response from server'
+                st.error(f"Failed to submit: {error_msg}")
+    
+    # ▼▼▼ BAGIAN BARU (DIPINDAHKAN): TAMPILKAN PESAN SUKSES DI BAWAH TOMBOL ▼▼▼
+    if st.session_state.submission_message:
+        st.success(st.session_state.submission_message)
+        if st.session_state.new_uids:
+            st.info(f"UIDs for update: {st.session_state.new_uids}")
+        # Hapus pesan setelah ditampilkan agar tidak muncul lagi
+        st.session_state.submission_message = None
+        st.session_state.new_uids = None
+    # ▲▲▲ AKHIR BAGIAN BARU ▲▲▲
 
 
 with tab2:
@@ -577,7 +663,7 @@ with tab3:
                         st.error(update_response.get("message", "Failed to update opportunity."))
                         
 with tab5:
-    st.header("✏️ Edit Data Entry (Error Correction)")
+    st.header("Edit Data Entry (Error Correction)")
     st.warning("Use this page for correcting input.")
 
     if 'lead_to_edit' not in st.session_state:
@@ -601,6 +687,14 @@ with tab5:
                     st.error("Failed to retrieve data from the database. Please try again.")
         else:
             st.warning("Please enter the UID.")
+    
+    if st.session_state.edit_submission_message:
+        st.success(st.session_state.edit_submission_message)
+        if st.session_state.edit_new_uid:
+            st.info(f"IMPORTANT: The UID has been updated. The new UID is: {st.session_state.edit_new_uid}")
+        # Hapus pesan setelah ditampilkan
+        st.session_state.edit_submission_message = None
+        st.session_state.edit_new_uid = None
 
     # --- LANGKAH 2: TAMPILKAN FORM EDIT JIKA DATA DITEMUKAN ---
     if st.session_state.lead_to_edit:
@@ -619,12 +713,8 @@ with tab5:
                 try:
                     if key: return [item.get(key) for item in data_list].index(value)
                     else: return data_list.index(value)
-                except (ValueError, TypeError): return 0
-            
-            edited_salesgroup = st.selectbox("Sales Group", all_sales_groups, index=get_index(all_sales_groups, lead.get('salesgroup_id')), key="edit_salesgroup")
-            sales_name_options = get_sales_name_by_sales_group(st.session_state.edit_salesgroup)
-            edited_sales_name = st.selectbox("Sales Name", sales_name_options, index=get_index(sales_name_options, lead.get('sales_name')), key="edit_salesname")
-            
+                except (ValueError, TypeError): return 0    
+                     
             edited_responsible = st.selectbox("Presales Account Manager", all_responsibles, index=get_index(all_responsibles, lead.get('responsible_name'), 'Responsible'), format_func=lambda x: x.get("Responsible", ""), key="edit_responsible")
             
             edited_pillar = st.selectbox("Pillar", all_pillars, index=get_index(all_pillars, lead.get('pillar')), key="edit_pillar")
@@ -687,8 +777,6 @@ with tab5:
         if st.button("Save Changes"):
             update_payload = {
                 "uid": lead.get('uid'),
-                "salesgroup_id": st.session_state.edit_salesgroup,
-                "sales_name": st.session_state.edit_salesname,
                 "responsible_name": st.session_state.edit_responsible.get('Responsible', ''),
                 "pillar": st.session_state.edit_pillar,
                 "solution": st.session_state.edit_solution,
@@ -702,15 +790,15 @@ with tab5:
             with st.spinner(f"Updating opportunity with UID: {lead.get('uid')}..."):
                 update_response = update_full_opportunity(update_payload)
                 if update_response and update_response.get("status") == 200:
-                    st.success(update_response.get("message"))
-                    
-                    updated_data = update_response.get("data", {})
-                    new_uid = updated_data.get("uid")
-                    if new_uid != lead.get('uid'):
-                        st.info(f"IMPORTANT: The UID has been updated. The new UID is: {new_uid}")
-                    
-                    st.session_state.lead_to_edit = None
-                    st.rerun()
+                        st.session_state.edit_submission_message = update_response.get("message")
+                        
+                        updated_data = update_response.get("data", {})
+                        new_uid = updated_data.get("uid")
+                        if new_uid != uid_to_find:
+                            st.session_state.edit_new_uid = new_uid
+                        
+                        st.session_state.lead_to_edit = None # Reset form
+                        st.rerun()
                 else:
-                    error_message = update_response.get("message", "Failed to update opportunity.") if update_response else "Failed to update opportunity."
-                    st.error(error_message)
+                        error_message = update_response.get("message", "Failed to update opportunity.") if update_response else "Failed to update opportunity."
+                        st.error(error_message)
