@@ -419,66 +419,96 @@ with tab1:
         })
         st.rerun()
 
-    # --- BAGIAN 3: SUBMIT ---
-    st.markdown("---")
-    st.subheader("Step 3: Submit Opportunity")
+# --- BAGIAN 3: SUBMIT ---
+st.markdown("---")
+st.subheader("Step 3: Submit Opportunity")
+
+# 1. Inisialisasi variabel di luar blok if
+all_presales_data = get_master('getPresales')
+presales_options = []
+presales_name_to_email_map = {}
+list_of_emails = []
+
+# 2. Coba proses data presales jika berhasil dimuat
+if all_presales_data:
+    try:
+        presales_name_to_email_map = {
+            item.get("PresalesName"): item.get("Email") 
+            for item in all_presales_data if item.get("PresalesName") and item.get("Email")
+        }
+        presales_options = sorted(list(presales_name_to_email_map.keys())) # Urutkan nama agar mudah dicari
+    except Exception as e:
+        # Jika ada error saat memproses data, tampilkan peringatan
+        st.warning(f"Terjadi masalah saat memproses daftar Presales: {e}")
+else:
+    # Jika data tidak berhasil dimuat sama sekali
+    st.warning("Tidak dapat memuat daftar Presales. Fitur notifikasi email tidak akan tersedia.")
+
+# 3. Tampilkan st.multiselect. Ini akan selalu muncul.
+# Jika presales_options kosong, widget akan muncul tapi tidak ada pilihan.
+selected_presales_names = st.multiselect(
+    "Tag Presales for Push Notification (Opsional)",
+    options=presales_options,
+    help="Anda bisa membiarkan kolom ini kosong, atau pilih satu/lebih nama untuk notifikasi."
+)
+
+# 4. Proses email hanya jika ada nama yang dipilih
+if selected_presales_names:
+    list_of_emails = [presales_name_to_email_map.get(name) for name in selected_presales_names if presales_name_to_email_map.get(name)]
+
+
+# 5. Tombol submit dan logikanya (tidak ada perubahan di sini)
+if st.button("Submit Opportunity and All Solutions", type="primary"):
+    # Kumpulkan data induk
+    parent_payload = {
+        "presales_name": presales_name.get("PresalesName", ""),
+        "salesgroup_id": salesgroup_id,
+        "sales_name": sales_name,
+        "opportunity_name": opportunity_name,
+        "start_date": start_date.strftime("%Y-%m-%d"),
+        "company_name": company_name_final,
+        "vertical_industry": vertical_industry_final
+    }
+
+    # Kumpulkan data product lines
+    lines_payload = []
+    for line in st.session_state.product_lines:
+        processed_line = line.copy()
+        responsible_obj = processed_line.get('responsible_name', {})
+        processed_line['responsible_name'] = responsible_obj.get('Responsible', '')
+        lines_payload.append(processed_line)
+
+    # Gabungkan menjadi payload akhir
+    final_payload = {
+        "parent_data": parent_payload,
+        "product_lines": lines_payload
+    }
     
-    # Kolom email notifikasi
-    final_email = st.text_input("Tag Email for Push Notification", placeholder="first_name.last_name@sisindokom.com", key="final_email")
-    st.info("**Tip: To send notifications to multiple emails, separate each address with a comma.**\n*Example: krisa@sisindokom.com, kurniawan@sisindokom.com*")
-    if st.button("Submit Opportunity and All Solutions", type="primary"):
-        # Kumpulkan data induk
-        parent_payload = {
-            "presales_name": presales_name.get("PresalesName", ""),
-            "salesgroup_id": salesgroup_id,
-            "sales_name": sales_name,
-            "opportunity_name": opportunity_name,
-            "start_date": start_date.strftime("%Y-%m-%d"),
-            "company_name": company_name_final,
-            "vertical_industry": vertical_industry_final
-        }
+    with st.spinner("Submitting all solutions..."):
+        response = add_multi_line_opportunity(final_payload)
+        if response and response.get("status") == 200:
+            st.session_state.submission_message = response.get("message")
+            created_data = response.get('data', [])
+            st.session_state.new_uids = [data.get('uid') for data in created_data]
+            
+            # Kirim email hanya jika list_of_emails tidak kosong
+            if list_of_emails:
+                opp_id = created_data[0].get('opportunity_id', 'N/A') if created_data else 'N/A'
+                email_subject = f"New Multi-Solution Opportunity Added: {parent_payload['opportunity_name']}"
+                email_body = f"A new opportunity '{parent_payload['opportunity_name']}' with Opportunity ID '{opp_id}' and {len(lines_payload)} solution(s) has been added. Please follow up."
+                email_data = {"recipients": list_of_emails, "subject": email_subject, "body": email_body}
+                send_notification_email(email_data)
+                st.session_state.submission_message += f" | Email notification successfully sent to {len(list_of_emails)} recipient(s)."
 
-        # Kumpulkan data product lines
-        lines_payload = []
-        for line in st.session_state.product_lines:
-            processed_line = line.copy()
-            # Ekstrak nama dari objek 'responsible_name'
-            responsible_obj = processed_line.get('responsible_name', {})
-            processed_line['responsible_name'] = responsible_obj.get('Responsible', '')
-            lines_payload.append(processed_line)
-
-        # Gabungkan menjadi payload akhir
-        final_payload = {
-            "parent_data": parent_payload,
-            "product_lines": lines_payload
-        }
-        
-        with st.spinner("Submitting all solutions..."):
-            response = add_multi_line_opportunity(final_payload)
-            if response and response.get("status") == 200:
-                st.session_state.submission_message = response.get("message")
-                created_data = response.get('data', [])
-                st.session_state.new_uids = [data.get('uid') for data in created_data]
-                
-                if final_email:
-                    list_of_emails = [addr.strip() for addr in final_email.split(',') if addr.strip()]
-                    if list_of_emails:
-                        opp_id = created_data[0].get('opportunity_id', 'N/A') if created_data else 'N/A'
-                        email_subject = f"New Multi-Solution Opportunity Added: {parent_payload['opportunity_name']}"
-                        email_body = f"A new opportunity '{parent_payload['opportunity_name']}' with Opportunity ID '{opp_id}' and {len(lines_payload)} solution(s) has been added. Please follow up."
-                        email_data = {"recipients": list_of_emails, "subject": email_subject, "body": email_body}
-                        send_notification_email(email_data)
-                        st.session_state.submission_message += f" | Email notification successfully sent to {len(list_of_emails)} recipient(s)."
-
-                # Reset form dan jalankan ulang untuk menampilkan pesan
-                st.session_state.product_lines = [{"id": 0}]
-                st.rerun()
-            else:
-                error_msg = response.get('message', 'Unknown error') if response else 'No response from server'
-                st.error(f"Failed to submit: {error_msg}")
+            # Reset form dan jalankan ulang
+            st.session_state.product_lines = [{"id": 0}]
+            st.rerun()
+        else:
+            error_msg = response.get('message', 'Unknown error') if response else 'No response from server'
+            st.error(f"Failed to submit: {error_msg}")
     
     # ▼▼▼ BAGIAN BARU (DIPINDAHKAN): TAMPILKAN PESAN SUKSES DI BAWAH TOMBOL ▼▼▼
-    if st.session_state.submission_message:
+if st.session_state.submission_message:
         st.success(st.session_state.submission_message)
         if st.session_state.new_uids:
             st.info(f"UIDs for update: {st.session_state.new_uids}")
@@ -486,7 +516,6 @@ with tab1:
         st.session_state.submission_message = None
         st.session_state.new_uids = None
     # ▲▲▲ AKHIR BAGIAN BARU ▲▲▲
-
 
 with tab2:
     st.header("All Opportunities Data")
