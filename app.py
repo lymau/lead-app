@@ -539,8 +539,6 @@ with tab3:
     keywords = [
         "Inputter",
         "Presales Account Manager",
-        "Sales Group",
-        "Sales Name",
         "Opportunity Name",
         "Pillar",
         "Solution",
@@ -558,12 +556,6 @@ with tab3:
     elif search_by_option == "Presales Account Manager":
         responsible_keywords = [x.get("Responsible", "Unknown") for x in get_master('getResponsibles')]
         search_query = st.selectbox("Select Presales Account Manager", responsible_keywords, key="search_query")
-    elif search_by_option == "Sales Group":
-        sales_group_keywords = [x for x in get_sales_groups()]
-        search_query = st.selectbox("Select Sales Group", sales_group_keywords, key="search_query")
-    elif search_by_option == "Sales Name":
-        sales_name_keywords = [x.get("SalesName", "Unknown") for x in get_master('getSalesGroups')]
-        search_query = st.selectbox("Select Sales Name", sales_name_keywords, key="search_query")
     elif search_by_option == "Opportunity Name":
         opportunity_name_keywords = [x.get("Desc", "Unknown") for x in get_master('getOpportunities')]
         search_query = st.selectbox("Select Opportunity Name", opportunity_name_keywords, key="search_query")
@@ -599,10 +591,6 @@ with tab3:
                 search_params["presales_name"] = search_query
             elif search_by_option == "Presales Account Manager":
                 search_params["responsible_name"] = search_query
-            elif search_by_option == "Sales Group":
-                search_params["salesgroup_id"] = search_query
-            elif search_by_option == "Sales Name":
-                search_params["sales_name"] = search_query
             elif search_by_option == "Opportunity Name":
                 search_params["opportunity_name"] = search_query
             elif search_by_option == "Pillar":
