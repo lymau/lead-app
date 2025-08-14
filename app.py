@@ -35,7 +35,7 @@ if not st.session_state.update_dismissed:
 # GET ALL MASTER DATA
 # ==============================================================================
 
-@st.cache_data(ttl=450) # Data akan di-cache selama 1 jam (3600 detik)
+@st.cache_data(ttl=600) # Data akan di-cache selama 7 menit (450 detik)
 def get_master(action: str):
     """
     Mengambil semua data dari sheet 'OBSERVERS' dari API Apps Script.
@@ -67,7 +67,7 @@ def get_master(action: str):
         st.error(f"JSON decode error fetching data: {e}")
         return []
 
-@st.cache_data(ttl=3600) # Data akan di-cache selama 1 jam (3600 detik)
+@st.cache_data(ttl=1800) # Data akan di-cache selama 30 menit (1800 detik)
 def get_pillars():
     df = pd.DataFrame(get_master('getPillars'))
     pillar = df['Pillar'].unique().tolist()
@@ -164,7 +164,6 @@ def update_lead(lead_data):
         st.error(f"Error parsing response JSON: {e}")
         return {"status": 500, "message": f"JSON Decode Error: {e}"}
 
-# ▼▼▼ FUNGSI UNTUK UPDATE DATA LENGKAP ▼▼▼
 def update_full_opportunity(lead_data):
     """Mengirimkan data lengkap untuk diperbarui melalui API."""
     url = f"{APPS_SCRIPT_API_URL}?action=updateFullOpportunity"
@@ -176,7 +175,6 @@ def update_full_opportunity(lead_data):
     except requests.exceptions.RequestException as e:
         st.error(f"Error saat memperbarui data: {e}")
         return None
-# ▲▲▲ AKHIR FUNGSI BARU ▲▲▲
 
 def clean_data_for_display(data):
     """Membersihkan data sebelum ditampilkan di st.dataframe untuk mencegah error."""
@@ -211,7 +209,6 @@ def get_all_leads():
     except json.JSONDecodeError as e:
         st.error(f"Error parsing response JSON: {e}")
         return {"status": 500, "message": f"JSON Decode Error: {e}"}
-
 
 def get_single_lead(search_params):
     """
@@ -506,8 +503,8 @@ with tab1:
             else:
                 error_msg = response.get('message', 'Unknown error') if response else 'No response from server'
                 st.error(f"Failed to submit: {error_msg}")
-        
-        # ▼▼▼ BAGIAN BARU (DIPINDAHKAN): TAMPILKAN PESAN SUKSES DI BAWAH TOMBOL ▼▼▼
+                
+        # --- BAGIAN 4: TAMPILKAN PESAN SUBMISSION ---
     if st.session_state.submission_message:
             st.success(st.session_state.submission_message)
             if st.session_state.new_uids:
@@ -515,7 +512,6 @@ with tab1:
             # Hapus pesan setelah ditampilkan agar tidak muncul lagi
             st.session_state.submission_message = None
             st.session_state.new_uids = None
-        # ▲▲▲ AKHIR BAGIAN BARU ▲▲▲
 
 with tab2:
     st.header("All Opportunities Data")
@@ -627,7 +623,7 @@ with tab3:
             st.warning("Please enter a search query.")
 
     with tab4:
-        # show all fields but it should not be editable, except for the notes, cost, and stage
+        # show all fields but it should not be editable, except for the notes and cost fields
         st.header("Update Opportunity")
         uid = st.text_input("Enter UID to search opportunity", key="uid")
         update_button = st.button("Get Opportunity Data")
