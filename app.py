@@ -708,119 +708,108 @@ with tab3:
                         
 with tab5:
     st.header("Edit Data Entry (Error Correction)")
-    st.warning("Use this page for correcting input.")
+    st.warning("Gunakan halaman ini untuk memperbaiki kesalahan input. Mengubah Sales Group akan membuat UID baru.")
 
     if 'lead_to_edit' not in st.session_state:
         st.session_state.lead_to_edit = None
 
-    # --- LANGKAH 1: CARI DATA ---
-    uid_to_find = st.text_input("Enter the UID of the opportunity to be corrected:", key="uid_finder_edit")
+    uid_to_find = st.text_input("Masukkan UID dari opportunity yang akan diperbaiki:", key="uid_finder_edit")
     if st.button("Find Data to Edit"):
         st.session_state.lead_to_edit = None
         if uid_to_find:
             with st.spinner("Fetching data..."):
                 response = get_single_lead({"uid": uid_to_find})
-                if response and response.get("status") == 200:
-                    lead_data = response.get("data")
-                    if lead_data:
-                        st.session_state.lead_to_edit = lead_data[0]
-                        st.success("Data found. Please edit the form below.")
-                    else:
-                        st.error("UID not found. Please check the UID and try again.")
+                if response and response.get("status") == 200 and response.get("data"):
+                    st.session_state.lead_to_edit = response.get("data")[0]
+                    st.success("Data ditemukan. Silakan edit form di bawah ini.")
                 else:
-                    st.error("Failed to retrieve data from the database. Please try again.")
+                    st.error("UID tidak ditemukan. Mohon periksa kembali UID dan coba lagi.")
         else:
-            st.warning("Please enter the UID.")
+            st.warning("Mohon masukkan UID.")
     
     if st.session_state.edit_submission_message:
         st.success(st.session_state.edit_submission_message)
         if st.session_state.edit_new_uid:
-            st.info(f"IMPORTANT: The UID has been updated. The new UID is: {st.session_state.edit_new_uid}")
-        # Hapus pesan setelah ditampilkan
+            st.info(f"PENTING: UID telah diperbarui. UID baru adalah: {st.session_state.edit_new_uid}")
         st.session_state.edit_submission_message = None
         st.session_state.edit_new_uid = None
 
-    # --- LANGKAH 2: TAMPILKAN FORM EDIT JIKA DATA DITEMUKAN ---
     if st.session_state.lead_to_edit:
         lead = st.session_state.lead_to_edit
         st.markdown("---")
-        st.subheader(f"Step 2: Edit Data for '{lead.get('opportunity_name', '')}'")
+        st.subheader(f"Step 2: Edit Data untuk '{lead.get('opportunity_name', '')}'")
 
-        # NOTE: Form dihapus untuk memungkinkan cascading dropdown interaktif
+        def get_index(data_list, value, key=None):
+            try:
+                if key: return [item.get(key) for item in data_list].index(value)
+                else: return data_list.index(value)
+            except (ValueError, TypeError): return 0
+        
+        # --- PERUBAHAN DIMULAI DI SINI ---
+        
+        # Ambil semua data master yang dibutuhkan
+        all_sales_groups = get_sales_groups()
+        all_responsibles = get_master('getResponsibles')
+        all_pillars = get_pillars()
+        all_brands = get_master('getBrands')
+        all_companies_data = get_master('getCompanies')
+        companies_df = pd.DataFrame(all_companies_data)
+        all_distributors = get_master('getDistributors')
+
+        # Form Edit
         col1, col2 = st.columns(2)
         with col1:
-            all_sales_groups = get_sales_groups()
-            all_responsibles = get_master('getResponsibles')
-            all_pillars = get_pillars()
-            all_brands = get_master('getBrands')
-            def get_index(data_list, value, key=None):
-                try:
-                    if key: return [item.get(key) for item in data_list].index(value)
-                    else: return data_list.index(value)
-                except (ValueError, TypeError): return 0    
-                     
-            edited_responsible = st.selectbox("Presales Account Manager", all_responsibles, index=get_index(all_responsibles, lead.get('responsible_name'), 'Responsible'), format_func=lambda x: x.get("Responsible", ""), key="edit_responsible")
+            edited_sales_group = st.selectbox(
+                "Sales Group", 
+                all_sales_groups, 
+                index=get_index(all_sales_groups, lead.get('salesgroup_id')), 
+                key="edit_sales_group"
+            )
             
+            # Widget untuk mengubah Sales Name (opsi bergantung pada Sales Group)
+            sales_name_options = get_sales_name_by_sales_group(st.session_state.edit_sales_group)
+            edited_sales_name = st.selectbox(
+                "Sales Name", 
+                sales_name_options, 
+                index=get_index(sales_name_options, lead.get('sales_name')), 
+                key="edit_sales_name"
+            )
+
+            edited_responsible = st.selectbox("Presales Account Manager", all_responsibles, index=get_index(all_responsibles, lead.get('responsible_name'), 'Responsible'), format_func=lambda x: x.get("Responsible", ""), key="edit_responsible")
+        
             edited_pillar = st.selectbox("Pillar", all_pillars, index=get_index(all_pillars, lead.get('pillar')), key="edit_pillar")
             solution_options = get_solutions(st.session_state.edit_pillar)
             edited_solution = st.selectbox("Solution", solution_options, index=get_index(solution_options, lead.get('solution')), key="edit_solution")
-        
+
         with col2:
-            all_companies_data = get_master('getCompanies')
-            all_distributors = get_master('getDistributors')
-            companies_df = pd.DataFrame(all_companies_data)
+            edited_company = st.selectbox("Company", all_companies_data, index=get_index(all_companies_data, lead.get('company_name'), 'Company'), format_func=lambda x: x.get("Company", ""), key="edit_company")
             
-            service_options = get_services(st.session_state.edit_solution)
-            edited_service = st.selectbox("Service", service_options, index=get_index(service_options, lead.get('service')), key="edit_service")
-
-            edited_brand = st.selectbox("Brand", all_brands, index=get_index(all_brands, lead.get('brand'), 'Brand'), format_func=lambda x: x.get("Brand", ""), key="edit_brand")
-            
-            edited_company = st.selectbox(
-                "Company", 
-                all_companies_data, 
-                index=get_index(all_companies_data, lead.get('company_name'), 'Company'), 
-                format_func=lambda x: x.get("Company", ""), 
-                key="edit_company"
-            )
-
             derived_vertical_industry = ""
-            if st.session_state.get('edit_company') and not companies_df.empty and 'Company' in companies_df.columns and 'Vertical Industry' in companies_df.columns:
+            if st.session_state.get('edit_company') and not companies_df.empty:
                 selected_company_name = st.session_state.edit_company.get('Company')
                 filtered_industry = companies_df[companies_df['Company'] == selected_company_name]['Vertical Industry']
                 if not filtered_industry.empty:
                     derived_vertical_industry = filtered_industry.iloc[0]
-
-            st.text_input(
-                "Vertical Industry", 
-                value=derived_vertical_industry, 
-                key="edit_vertical",
-                disabled=True
-            )
+            st.text_input("Vertical Industry", value=derived_vertical_industry, key="edit_vertical", disabled=True)
             
-            # --- LOGIKA BARU UNTUK DISTRIBUTOR ---
-            is_via_distributor_default = 1 if lead.get('distributor_name') == "Not via distributor" else 0
-            is_via_distributor_choice = st.radio(
-                "Is it via distributor?",
-                ("Yes", "No"),
-                index=is_via_distributor_default,
-                key="edit_is_via_distributor"
-            )
-
+            service_options = get_services(st.session_state.edit_solution)
+            edited_service = st.selectbox("Service", service_options, index=get_index(service_options, lead.get('service')), key="edit_service")
+            edited_brand = st.selectbox("Brand", all_brands, index=get_index(all_brands, lead.get('brand'), 'Brand'), format_func=lambda x: x.get("Brand", ""), key="edit_brand")
+            
+            is_via_distributor_default = 0 if lead.get('distributor_name', 'Not via distributor') != "Not via distributor" else 1
+            is_via_distributor_choice = st.radio("Via Distributor?", ("Yes", "No"), index=is_via_distributor_default, key="edit_is_via_distributor", horizontal=True)
+            
             if is_via_distributor_choice == "Yes":
-                edited_distributor = st.selectbox(
-                    "Distributor",
-                    all_distributors,
-                    index=get_index(all_distributors, lead.get('distributor_name'), 'Distributor'),
-                    format_func=lambda x: x.get("Distributor", ""),
-                    key="edit_distributor_select"
-                )
+                edited_distributor = st.selectbox("Distributor", all_distributors, index=get_index(all_distributors, lead.get('distributor_name'), 'Distributor'), format_func=lambda x: x.get("Distributor", ""), key="edit_distributor_select")
             else:
                 edited_distributor = "Not via distributor"
-            # --- AKHIR LOGIKA BARU ---
 
-        if st.button("Save Changes"):
+        if st.button("Save Changes", type="primary"):
+            # Kumpulkan semua data yang diubah
             update_payload = {
                 "uid": lead.get('uid'),
+                "salesgroup_id": st.session_state.edit_sales_group,
+                "sales_name": st.session_state.edit_sales_name,
                 "responsible_name": st.session_state.edit_responsible.get('Responsible', ''),
                 "pillar": st.session_state.edit_pillar,
                 "solution": st.session_state.edit_solution,
@@ -831,18 +820,17 @@ with tab5:
                 "distributor_name": edited_distributor.get('Distributor', '') if isinstance(edited_distributor, dict) else edited_distributor
             }
             
-            with st.spinner(f"Updating opportunity with UID: {lead.get('uid')}..."):
+            with st.spinner(f"Updating opportunity..."):
                 update_response = update_full_opportunity(update_payload)
                 if update_response and update_response.get("status") == 200:
-                        st.session_state.edit_submission_message = update_response.get("message")
-                        
-                        updated_data = update_response.get("data", {})
-                        new_uid = updated_data.get("uid")
-                        if new_uid != uid_to_find:
-                            st.session_state.edit_new_uid = new_uid
-                        
-                        st.session_state.lead_to_edit = None # Reset form
-                        st.rerun()
+                    st.session_state.edit_submission_message = update_response.get("message")
+                    updated_data = update_response.get("data", {})
+                    new_uid = updated_data.get("uid")
+                    if new_uid != uid_to_find:
+                        st.session_state.edit_new_uid = new_uid
+                    
+                    st.session_state.lead_to_edit = None # Reset form
+                    st.rerun()
                 else:
-                        error_message = update_response.get("message", "Failed to update opportunity.") if update_response else "Failed to update opportunity."
-                        st.error(error_message)
+                    error_message = update_response.get("message", "Failed to update.") if update_response else "Failed to update."
+                    st.error(error_message)
