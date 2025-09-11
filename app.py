@@ -336,7 +336,17 @@ with tab1:
 
     with parent_col2:
         opportunity_name = st.selectbox("Opportunity Name", [opt.get("Desc") for opt in get_master('getOpportunities')], key="parent_opportunity_name", accept_new_options=True, index=None, placeholder="Choose or type new opportunity name")
-        st.warning("IMPORTANT: Check that this opportunity wasn't submitted in Q1/Q2 to prevent duplicate entries.")
+        st.warning("""
+        Format Opportunity Name:
+                   
+        - If direct:
+        End User - Opportunity Name - Month Year
+                    
+        - If via B2B Channel:
+        [B2B Channel] End User - Opportunity Name - Month Year
+                    
+                    """)
+        
         start_date = st.date_input("Start Date", key="parent_start_date")
         all_companies_data = get_master('getCompanies')
         companies_df = pd.DataFrame(all_companies_data)
