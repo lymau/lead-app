@@ -708,12 +708,11 @@ with tab3:
                         
 with tab5:
     st.header("Edit Data Entry (Error Correction)")
-    st.warning("Gunakan halaman ini untuk memperbaiki kesalahan input. Mengubah Sales Group akan membuat UID baru.")
-
+    st.warning("Use this page to correct input errors. Please be aware that changing the Sales Group will generate a new UID.")
     if 'lead_to_edit' not in st.session_state:
         st.session_state.lead_to_edit = None
 
-    uid_to_find = st.text_input("Masukkan UID dari opportunity yang akan diperbaiki:", key="uid_finder_edit")
+    uid_to_find = st.text_input("Enter the UID of the opportunity to be corrected:", key="uid_finder_edit")
     if st.button("Find Data to Edit"):
         st.session_state.lead_to_edit = None
         if uid_to_find:
@@ -721,23 +720,23 @@ with tab5:
                 response = get_single_lead({"uid": uid_to_find})
                 if response and response.get("status") == 200 and response.get("data"):
                     st.session_state.lead_to_edit = response.get("data")[0]
-                    st.success("Data ditemukan. Silakan edit form di bawah ini.")
+                    st.success("Data found. Please edit the form below.")
                 else:
-                    st.error("UID tidak ditemukan. Mohon periksa kembali UID dan coba lagi.")
+                    st.error("UID not found. Please double-check the UID and try again.")
         else:
-            st.warning("Mohon masukkan UID.")
+            st.warning("Please enter a UID.")
     
     if st.session_state.edit_submission_message:
         st.success(st.session_state.edit_submission_message)
         if st.session_state.edit_new_uid:
-            st.info(f"PENTING: UID telah diperbarui. UID baru adalah: {st.session_state.edit_new_uid}")
+            st.info(f"IMPORTANT: The UID has been updated. The new UID is: {st.session_state.edit_new_uid}")
         st.session_state.edit_submission_message = None
         st.session_state.edit_new_uid = None
 
     if st.session_state.lead_to_edit:
         lead = st.session_state.lead_to_edit
         st.markdown("---")
-        st.subheader(f"Step 2: Edit Data untuk '{lead.get('opportunity_name', '')}'")
+        st.subheader(f"Step 2: Edit Data for '{lead.get('opportunity_name', '')}'")
 
         def get_index(data_list, value, key=None):
             try:
