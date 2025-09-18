@@ -20,9 +20,11 @@ if 'update_dismissed' not in st.session_state:
 if not st.session_state.update_dismissed:
     # Gunakan st.info atau st.success untuk tampilan yang menarik
     with st.container(border=True):
-        st.subheader("🚀 Update Terbaru Aplikasi! (v1.2)")
+        st.subheader("🚀 Update Terbaru Aplikasi! (v1.3)")
         st.markdown("""
-        **Pembaruan Besar di Tab "Add Opportunity"!** Formulir kini mendukung entri multi-solusi dalam satu kali submit.
+        **Peningkatan Fitur Keterbacaan Angka!** Kini pada Tab "Add Opportunity" dan "Update Opportunity", Anda bisa melihat format Rupiah (`Rp 1.000.000`) secara langsung di bawah kolom **Cost**.
+        
+        **Caranya:** Setelah selesai mengetik angka di kolom Cost, cukup **tekan tombol Enter** untuk melihat formatnya.
         """)
         
         # Buat tombol untuk menutup notifikasi
