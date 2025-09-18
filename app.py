@@ -30,6 +30,14 @@ if not st.session_state.update_dismissed:
             st.session_state.update_dismissed = True
             st.rerun() # Jalankan ulang script agar notifikasi langsung hilang
     st.markdown("---") # Garis pemisah
+    
+def format_number(number):
+    """Mengubah angka menjadi string dengan pemisah titik."""
+    try:
+        num = int(number)
+        return f"{num:,}".replace(",", ".")
+    except (ValueError, TypeError):
+        return "0"
 
 # ==============================================================================
 # GET ALL MASTER DATA
@@ -177,36 +185,35 @@ def update_full_opportunity(lead_data):
         return None
 
 def clean_data_for_display(data):
-    """
-    Membersihkan dan MENGATUR ULANG URUTAN KOLOM data sebelum ditampilkan.
-    """
+    """Membersihkan, mengatur ulang, dan MEMFORMAT KOLOM ANGKA untuk ditampilkan."""
     if not data:
         return pd.DataFrame()
     df = pd.DataFrame(data)
 
-    # 1. Tentukan urutan kolom yang Anda inginkan.
     desired_order = [
         'uid', 'presales_name', 'responsible_name', 'opportunity_name', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'notes', 'salesgroup_id','sales_name', 'start_date'
     ]
-
-    # 2. Filter urutan ideal berdasarkan kolom yang ada di DataFrame
+    # Filter hanya kolom yang ada di data
     existing_columns_in_order = [col for col in desired_order if col in df.columns]
+    
+    # Dapatkan kolom yang tersisa
+    remaining_columns = [col for col in df.columns if col not in existing_columns_in_order]
+    
+    # Gabungkan
+    df = df[existing_columns_in_order + remaining_columns]
 
-    # 3. Tambahkan kolom sisa yang tidak ada di daftar 'desired_order' ke bagian akhir
-    # remaining_columns = [col for col in df.columns if col not in existing_columns_in_order]
-
-    # 4. Gabungkan untuk mendapatkan urutan final
-    final_column_order = existing_columns_in_order # + remaining_columns
-
-    # 5. Terapkan urutan baru
-    df = df[final_column_order]
-
-    # Membersihkan tipe data
+    # Konversi ke numerik dulu, penting untuk sorting jika diperlukan
     for col in ['cost', 'selling_price']:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-    
-    return df
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+    # Gunakan Styler untuk memformat tampilan tanpa mengubah tipe data asli
+    styler = df.style
+    for col in ['cost', 'selling_price']:
+        if col in df.columns:
+            styler = styler.format({col: lambda x: f"Rp {format_number(x)}"})
+            
+    return styler
 
 def get_all_leads():
     """
@@ -418,7 +425,10 @@ with tab1:
                 line['brand'] = st.selectbox("Brand", brand_options, key=f"brand_{line['id']}")
                 channel_options = get_channels(line.get('brand'))
                 line['channel'] = st.selectbox("Channel", channel_options, key=f"channel_{line['id']}")
-                line['cost'] = st.number_input("Cost", min_value=0, step=10000, key=f"cost_{line['id']}")
+                line['cost'] = st.number_input("Cost", min_value=0, step=1000, key=f"cost_{line['id']}", format="%d")
+
+                # Tambahkan st.caption di bawahnya untuk memberikan umpan balik
+                st.caption(f"Reads: Rp {format_number(line.get('cost', 0))}")
                 note_message = "Note: All values must be in Indonesian Rupiah (IDR). (e.g., 1 USD = 16,500 IDR)."
                 if line.get("brand") == "Cisco":
                     note_message += " For Cisco only: First, apply a 50% discount to the price, then multiply by the IDR exchange rate."
@@ -653,56 +663,76 @@ with tab3:
         else:
             st.warning("Please enter a search query.")
 
-    with tab4:
-        # show all fields but it should not be editable, except for the notes and cost fields
-        st.header("Update Opportunity")
-        uid = st.text_input("Enter UID to search opportunity", key="uid")
-        update_button = st.button("Get Opportunity Data")
-        lead = {}
-        if update_button and uid:
+with tab4:
+    st.header("Update Opportunity")
+
+    # Inisialisasi semua session_state yang dibutuhkan di awal
+    if 'lead_to_update' not in st.session_state:
+        st.session_state.lead_to_update = None
+    if 'update_message' not in st.session_state:
+        st.session_state.update_message = None
+
+    # BARU: Blok untuk menampilkan pesan dari session_state
+    if st.session_state.update_message:
+        # Tampilkan pesan sukses jika ada
+        st.success(st.session_state.update_message)
+        # Hapus pesan setelah ditampilkan
+        st.session_state.update_message = None
+
+    uid = st.text_input("Enter UID to search opportunity", key="uid_update")
+    
+    if st.button("Get Opportunity Data"):
+        st.session_state.lead_to_update = None
+        st.session_state.update_message = None # Hapus juga pesan lama saat cari baru
+        if uid:
             with st.spinner(f"Retrieving opportunity data with uid: {uid}..."):
                 response = get_single_lead({"uid": uid})
-                if response and response.get("status") == 200:
-                    lead_data = response.get("data")
-                    if lead_data:
-                        lead = lead_data[0]
-                        st.write(f"🆔 **Data Lead dengan UID:** {uid}")
-                        st.write(f"👤 **Inputter:** {lead.get('presales_name', 'Unknown')}")
-                        st.write(f"🧑‍💼 **Presales Account Manager:** {lead.get('responsible_name', 'Unknown')}")
-                        st.write(f"🏷️ **Opportunity Name:** {lead.get('opportunity_name', 'Unknown')}")
-                        st.write(f"🏛️ **Pillar:** {lead.get('pillar', 'Unknown')}")
-                        st.write(f"🧩 **Solution:** {lead.get('solution', 'Unknown')}")
-                        st.write(f"🛠️ **Service:** {lead.get('service', 'Unknown')}")
-                        st.write(f"🏷️ **Brand:** {lead.get('brand', 'Unknown')}")
-                        st.write(f"📡 **Channel:** {lead.get('channel', 'Unknown')}")
-                        st.write(f"🏢 **Company:** {lead.get('company_name', 'Unknown')}")
-                        st.write(f"🏭 **Vertical Industry:** {lead.get('vertical_industry', 'Unknown')}")
-                        st.write(f"💰 **Cost:** {lead.get('cost', 0)}")
-                        st.write(f"📝 **Notes:** {lead.get('notes', 'No notes available')}")
-                        st.write(f"📅 **Created At:** {lead.get('created_at', 'Unknown')}")
-
-                    else:
-                        st.warning("No opportunity found with the given UID.")
+                if response and response.get("status") == 200 and response.get("data"):
+                    st.session_state.lead_to_update = response.get("data")[0]
                 else:
-                    st.error(response.get("message", "Failed to retrieve opportunity data."))
-                    st.json(response)
-                    
-        with st.form(key="update_lead_form"):
-            # editable fields
-            notes = st.text_area("Notes", value=lead.get("Notes", ""), height=100, key="update_notes")
-            cost = st.number_input("Cost", value=lead.get("Cost", 0), min_value=0, step=10000, key="update_cost")
+                    st.error(f"Failed to retrieve data or UID '{uid}' not found.")
+        else:
+            st.warning("Please enter a UID.")
+
+    if st.session_state.lead_to_update:
+        lead = st.session_state.lead_to_update
+        
+        st.write(f"🆔 **Data Lead dengan UID:** {lead.get('uid', 'N/A')}")
+        st.write(f"👤 **Inputter:** {lead.get('presales_name', 'Unknown')}")
+        st.write(f"🧑‍💼 **Presales Account Manager:** {lead.get('responsible_name', 'Unknown')}")
+        st.write(f"🏷️ **Opportunity Name:** {lead.get('opportunity_name', 'Unknown')}")
+        st.write(f"🏛️ **Pillar:** {lead.get('pillar', 'Unknown')}")
+        st.write(f"🧩 **Solution:** {lead.get('solution', 'Unknown')}")
+        st.write(f"🛠️ **Service:** {lead.get('service', 'Unknown')}")
+        st.write(f"🏷️ **Brand:** {lead.get('brand', 'Unknown')}")
+        st.write(f"📡 **Channel:** {lead.get('channel', 'Unknown')}")
+        st.write(f"🏢 **Company:** {lead.get('company_name', 'Unknown')}")
+        st.write(f"🏭 **Vertical Industry:** {lead.get('vertical_industry', 'Unknown')}")
+        st.write(f"💰 **Cost:** {lead.get('cost', 0)}")
+        st.write(f"📝 **Notes:** {lead.get('notes', 'No notes available')}")
+        st.write(f"📅 **Created At:** {lead.get('created_at', 'Unknown')}")
+        st.markdown("---")
+
+        notes = st.text_area("Notes", value=lead.get("notes", ""), height=100, key="update_notes")
+        cost = st.number_input("Cost", value=int(lead.get("cost", 0)), min_value=0, step=10000, key="update_cost")
+        st.caption(f"Reads: Rp {format_number(st.session_state.get('update_cost', 0))}")
+
+        with st.form(key="update_lead_form_submit_only"):
             submit_button = st.form_submit_button("Update Opportunity")
+            
             if submit_button:
                 update_data = {
-                                "uid": uid,
-                                "notes": notes,
-                                "cost": cost,
-                            }
-
+                    "uid": lead.get('uid'),
+                    "notes": st.session_state.update_notes,
+                    "cost": st.session_state.update_cost,
+                }
                 with st.spinner(f"Updating opportunity {uid}..."):
                     update_response = update_lead(update_data)
                     if update_response and update_response.get("status") == 200:
-                        st.success(update_response.get("message"))
+                        # BARU: SIMPAN pesan ke session_state, JANGAN langsung tampilkan
+                        st.session_state.update_message = update_response.get("message")
+                        st.session_state.lead_to_update = None
+                        st.rerun()
                     else:
                         st.error(update_response.get("message", "Failed to update opportunity."))
                         
