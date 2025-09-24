@@ -113,6 +113,14 @@ def get_activity_log():
     # Kita bisa gunakan ulang fungsi get_master karena polanya sama
     return get_master('getActivityLog')
 
+def get_pam_mapping_dict():
+    """Mengambil data mapping Inputter -> PAM dari sheet dan mengubahnya menjadi dictionary."""
+    mapping_data = get_master('getPamMapping')
+    if not mapping_data:
+        st.warning("Could not load Presales Account Manager mapping. Using default.")
+        return {}
+    return {item['InputterName']: item['PamName'] for item in mapping_data if 'InputterName' in item and 'PamName' in item}
+
 # ==============================================================================
 # FUNGSI UNTUK BERINTERAKSI DENGAN API
 # ==============================================================================
@@ -333,15 +341,31 @@ if 'edit_new_uid' not in st.session_state:
 with tab1:
     st.header("Add New Opportunity (Multi-Solution)")
     st.info("Fill out the main details once, then add one or more solutions below.")
+    
+    inputter_to_pam_map = get_pam_mapping_dict()
+    DEFAULT_PAM = "Not Assigned"
 
     # --- BAGIAN 1: DATA INDUK (PARENT DATA) ---
     st.subheader("Step 1: Main Opportunity Details")
     
     parent_col1, parent_col2 = st.columns(2)
     with parent_col1:
-        presales_name = st.selectbox("Inputter", get_master('getPresales'), format_func=lambda x: x.get("PresalesName", "Unknown"), key="parent_presales_name")
+        # KOREKSI: Implementasi penuh logika PAM otomatis/fleksibel
+        presales_name_obj = st.selectbox("Inputter", get_master('getPresales'), format_func=lambda x: x.get("PresalesName", "Unknown"), key="parent_presales_name")
+        selected_inputter_name = presales_name_obj.get("PresalesName", "") if presales_name_obj else ""
+        
+        pam_rule = inputter_to_pam_map.get(selected_inputter_name, DEFAULT_PAM)
+        
+        if pam_rule == "FLEKSIBEL":
+            pam_object = st.selectbox("Choose Presales Account Manager", get_master('getResponsibles'), format_func=lambda x: x.get("Responsible", "Unknown"), key="pam_flexible_choice")
+            responsible_name_final = pam_object.get('Responsible', '') if pam_object else ""
+        else:
+            responsible_name_final = pam_rule
+            st.text_input("Presales Account Manager", value=responsible_name_final, disabled=True)
+
         salesgroup_id = st.selectbox("Choose Sales Group", get_sales_groups(), key="parent_salesgroup_id")
         sales_name = st.selectbox("Choose Sales Name", get_sales_name_by_sales_group(st.session_state.get("parent_salesgroup_id")), key="parent_sales_name")
+
 
     with parent_col2:
         opportunity_name = st.selectbox("Opportunity Name", [opt.get("Desc") for opt in get_master('getOpportunities')], key="parent_opportunity_name", accept_new_options=True, index=None, placeholder="Choose or type new opportunity name")
@@ -406,13 +430,6 @@ with tab1:
                 if cols[1].button("❌", key=f"remove_{line['id']}", help="Remove this line"):
                     st.session_state.product_lines.pop(i)
                     st.rerun()
-            
-            line['responsible_name'] = st.selectbox(
-                "Choose Presales Account Manager", 
-                get_master('getResponsibles'), 
-                format_func=lambda x: x.get("Responsible", "Unknown"), 
-                key=f"responsible_{line['id']}"
-            )
 
             line_col1, line_col2 = st.columns(2)
             with line_col1:
@@ -501,7 +518,8 @@ with tab1:
     if st.button("Submit Opportunity and All Solutions", type="primary"):
         # Kumpulkan data induk
         parent_payload = {
-            "presales_name": presales_name.get("PresalesName", ""),
+            "presales_name": selected_inputter_name,
+            "responsible_name": responsible_name_final,
             "salesgroup_id": salesgroup_id,
             "sales_name": sales_name,
             "opportunity_name": opportunity_name,
@@ -511,18 +529,9 @@ with tab1:
         }
 
         # Kumpulkan data product lines
-        lines_payload = []
-        for line in st.session_state.product_lines:
-            processed_line = line.copy()
-            responsible_obj = processed_line.get('responsible_name', {})
-            processed_line['responsible_name'] = responsible_obj.get('Responsible', '')
-            lines_payload.append(processed_line)
-
-        # Gabungkan menjadi payload akhir
-        final_payload = {
-            "parent_data": parent_payload,
-            "product_lines": lines_payload
-        }
+        lines_payload = [line.copy() for line in st.session_state.product_lines]
+        
+        final_payload = {"parent_data": parent_payload, "product_lines": lines_payload}
         
         with st.spinner("Submitting all solutions..."):
             response = add_multi_line_opportunity(final_payload)
@@ -531,30 +540,25 @@ with tab1:
                 created_data = response.get('data', [])
                 st.session_state.new_uids = [data.get('uid') for data in created_data]
                 
-                # Kirim email hanya jika list_of_emails tidak kosong
+                list_of_emails = [presales_name_to_email_map.get(name) for name in selected_presales_names if presales_name_to_email_map.get(name)]
                 if list_of_emails:
                     opp_id = created_data[0].get('opportunity_id', 'N/A') if created_data else 'N/A'
                     email_subject = f"New Multi-Solution Opportunity Added: {parent_payload['opportunity_name']}"
-                    email_body = f"A new opportunity '{parent_payload['opportunity_name']}' with Opportunity ID '{opp_id}' and {len(lines_payload)} solution(s) has been added. Please follow up."
-                    email_data = {"recipients": list_of_emails, "subject": email_subject, "body": email_body}
-                    send_notification_email(email_data)
-                    st.session_state.submission_message += f" | Email notification successfully sent to {len(list_of_emails)} recipient(s)."
+                    email_body = f"A new opportunity '{parent_payload['opportunity_name']}' (ID: {opp_id}) has been added by {selected_inputter_name} with {len(lines_payload)} solution(s). Please follow up."
+                    send_notification_email({"recipients": list_of_emails, "subject": email_subject, "body": email_body})
+                    st.session_state.submission_message += f" | Email notification sent to {len(list_of_emails)} recipient(s)."
 
-                # Reset form dan jalankan ulang
                 st.session_state.product_lines = [{"id": 0}]
                 st.rerun()
             else:
-                error_msg = response.get('message', 'Unknown error') if response else 'No response from server'
-                st.error(f"Failed to submit: {error_msg}")
-                
-        # --- BAGIAN 4: TAMPILKAN PESAN SUBMISSION ---
+                st.error(f"Failed to submit: {response.get('message', 'Unknown error') if response else 'No response from server'}")
+
     if st.session_state.submission_message:
-            st.success(st.session_state.submission_message)
-            if st.session_state.new_uids:
-                st.info(f"UIDs for update: {st.session_state.new_uids}")
-            # Hapus pesan setelah ditampilkan agar tidak muncul lagi
-            st.session_state.submission_message = None
-            st.session_state.new_uids = None
+        st.success(st.session_state.submission_message)
+        if st.session_state.new_uids: st.info(f"UIDs for update: {st.session_state.new_uids}")
+        st.session_state.submission_message = None
+        st.session_state.new_uids = None
+
 
 with tab2:
     st.header("All Opportunities Data")
