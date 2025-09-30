@@ -13,24 +13,27 @@ st.set_page_config(
 )
 
 # Inisialisasi session state untuk mengingat apakah notifikasi sudah ditutup
-if 'update_dismissed' not in st.session_state:
-    st.session_state.update_dismissed = False
+if 'update_dismissed_v1_4' not in st.session_state:
+    st.session_state.update_dismissed_v1_4 = False
 
 # Tampilkan notifikasi hanya jika belum ditutup
-if not st.session_state.update_dismissed:
-    # Gunakan st.info atau st.success untuk tampilan yang menarik
+if not st.session_state.update_dismissed_v1_4:
     with st.container(border=True):
-        st.subheader("🚀 Update Terbaru Aplikasi! (v1.3)")
+        st.subheader("🚀 Update Terbaru Aplikasi! (v1.4)")
         st.markdown("""
-        **Peningkatan Fitur Keterbacaan Angka!** Kini pada Tab "Add Opportunity" dan "Update Opportunity", Anda bisa melihat format Rupiah (`Rp 1.000.000`) secara langsung di bawah kolom **Cost**.
+        #### 📜 Lacak Semua Perubahan dengan Activity Log!
+        Kini tersedia tab baru **'Activity Log'** untuk melihat riwayat semua penambahan dan perubahan data. Anda juga bisa memfilter log berdasarkan *Opportunity Name*.
         
-        **Caranya:** Setelah selesai mengetik angka di kolom Cost, cukup **tekan tombol Enter** untuk melihat formatnya.
+        ---
+        
+        *Peningkatan sebelumnya (v1.3):*
+        * **Fitur Keterbacaan Angka:** Anda bisa melihat format Rupiah (`Rp 1.000.000`) secara langsung di bawah kolom **Cost** pada tab "Add Opportunity" dan "Update Opportunity". Cukup tekan **Enter** setelah mengetik.
         """)
         
         # Buat tombol untuk menutup notifikasi
-        if st.button("Tutup Pemberitahuan Ini", key="dismiss_update"):
-            st.session_state.update_dismissed = True
-            st.rerun() # Jalankan ulang script agar notifikasi langsung hilang
+        if st.button("Tutup Pemberitahuan Ini", key="dismiss_update_v1_4"):
+            st.session_state.update_dismissed_v1_4 = True
+            st.rerun()
     st.markdown("---") # Garis pemisah
     
 def format_number(number):
@@ -324,7 +327,7 @@ st.title("Presales App - SISINDOKOM")
 st.markdown("---")
 
 # Tab navigasi
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["Add Opportunity", "View Opportunities", "Search Opportunity", "Update Opportunity", "Edit Opportunity"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Add Opportunity", "View Opportunities", "Search Opportunity", "Update Opportunity", "Edit Opportunity", "Activity Log"])
 
 # Inisialisasi session state untuk menyimpan product lines
 if 'product_lines' not in st.session_state:
@@ -496,17 +499,17 @@ with tab1:
             presales_options = sorted(list(presales_name_to_email_map.keys())) # Urutkan nama agar mudah dicari
         except Exception as e:
             # Jika ada error saat memproses data, tampilkan peringatan
-            st.warning(f"Terjadi masalah saat memproses daftar Presales: {e}")
+            st.warning(f"Error processing Presales data: {e}")
     else:
         # Jika data tidak berhasil dimuat sama sekali
-        st.warning("Tidak dapat memuat daftar Presales. Fitur notifikasi email tidak akan tersedia.")
+        st.warning("Unable to load Presales list. Email notification feature will not be available.")
 
     # 3. Tampilkan st.multiselect. Ini akan selalu muncul.
     # Jika presales_options kosong, widget akan muncul tapi tidak ada pilihan.
     selected_presales_names = st.multiselect(
-        "Tag Presales for Push Notification (Opsional)",
+        "Tag Presales for Push Notification (Optional)",
         options=presales_options,
-        help="Anda bisa membiarkan kolom ini kosong, atau pilih satu/lebih nama untuk notifikasi."
+        help="Select one or more Presales names to notify via email upon submission. If none selected, no email will be sent.",
     )
 
     # 4. Proses email hanya jika ada nama yang dipilih
@@ -720,7 +723,13 @@ with tab4:
         st.markdown("---")
 
         notes = st.text_area("Notes", value=lead.get("notes", ""), height=100, key="update_notes")
-        cost = st.number_input("Cost", value=int(lead.get("cost", 0)), min_value=0, step=10000, key="update_cost")
+        try:
+            # Menggunakan float dulu untuk menangani jika ada angka desimal dari sheet (misal: 10000.0)
+            initial_cost_value = int(float(lead.get("cost", 0)))
+        except (ValueError, TypeError):
+            initial_cost_value = 0
+        
+        cost = st.number_input("Cost", value=initial_cost_value, min_value=0, step=10000, key="update_cost")
         st.caption(f"Reads: Rp {format_number(st.session_state.get('update_cost', 0))}")
 
         with st.form(key="update_lead_form_submit_only"):
@@ -731,6 +740,7 @@ with tab4:
                     "uid": lead.get('uid'),
                     "notes": st.session_state.update_notes,
                     "cost": st.session_state.update_cost,
+                    "user": lead.get('presales_name')
                 }
                 with st.spinner(f"Updating opportunity {uid}..."):
                     update_response = update_lead(update_data)
@@ -843,6 +853,7 @@ with tab5:
             # Kumpulkan semua data yang diubah
             update_payload = {
                 "uid": lead.get('uid'),
+                "user": lead.get('presales_name'),
                 "salesgroup_id": st.session_state.edit_sales_group,
                 "sales_name": st.session_state.edit_sales_name,
                 "responsible_name": st.session_state.edit_responsible.get('Responsible', ''),
@@ -869,3 +880,74 @@ with tab5:
                 else:
                     error_message = update_response.get("message", "Failed to update.") if update_response else "Failed to update."
                     st.error(error_message)
+
+with tab6:
+    st.header("Activity Log / Audit Trail")
+    st.info("This log records all creations and changes made to the opportunity data.")
+
+    if st.button("Refresh Log"):
+        st.cache_data.clear() 
+    
+    with st.spinner("Fetching activity log..."):
+        # Panggil API untuk mendapatkan data log
+        log_data = get_master('getActivityLog') 
+        
+        if log_data:
+            df_log = pd.DataFrame(log_data)
+            
+            # --- LOGIKA UNTUK MENAMPILKAN DROPDOWN DAN FILTER ---
+            
+            # 1. Cek apakah kolom 'OpportunityName' ada di data dan tidak kosong
+            if 'OpportunityName' in df_log.columns and not df_log['OpportunityName'].empty:
+                
+                # 2. Buat daftar nama peluang yang unik untuk dijadikan opsi dropdown
+                opportunity_options = sorted(df_log['OpportunityName'].dropna().unique().tolist())
+                opportunity_options.insert(0, "All Opportunities")
+
+                # 3. Tampilkan widget dropdown/selectbox kepada pengguna
+                selected_opportunity = st.selectbox(
+                    "Select an Opportunity Name to track",
+                    options=opportunity_options,
+                    key="log_opportunity_filter"
+                )
+
+                # 4. Lakukan filter pada DataFrame berdasarkan pilihan pengguna
+                if selected_opportunity != "All Opportunities":
+                    df_to_display = df_log[df_log['OpportunityName'] == selected_opportunity]
+                else:
+                    df_to_display = df_log
+            else:
+                # Jika kolom OpportunityName tidak ada, tampilkan semua data tanpa filter
+                df_to_display = df_log
+            
+            # --- AKHIR DARI LOGIKA FILTER ---
+
+            # Proses selanjutnya menggunakan df_to_display yang sudah difilter
+            if not df_to_display.empty:
+                
+                # ▼▼▼ BLOK YANG DIMODIFIKASI UNTUK KONVERSI WAKTU ▼▼▼
+                # Urutkan dan format data waktu
+                if 'Timestamp' in df_to_display.columns:
+                    # Konversi ke objek datetime yang mengenali timezone (UTC)
+                    df_to_display['Timestamp'] = pd.to_datetime(df_to_display['Timestamp'])
+                    
+                    # Urutkan berdasarkan waktu (sebelum formatnya diubah menjadi string)
+                    df_to_display = df_to_display.sort_values(by="Timestamp", ascending=False)
+                    
+                    # Konversi ke WIB (GMT+7) dan format ulang sebagai string yang mudah dibaca
+                    df_to_display['Timestamp'] = df_to_display['Timestamp'].dt.tz_convert('Asia/Jakarta').dt.strftime('%Y-%m-%d %H:%M:%S')
+                # ▲▲▲ AKHIR DARI BLOK MODIFIKASI ▲▲▲
+
+                # Ubah tipe data untuk mencegah error tampilan
+                if 'OldValue' in df_to_display.columns:
+                    df_to_display['OldValue'] = df_to_display['OldValue'].astype(str)
+                if 'NewValue' in df_to_display.columns:
+                    df_to_display['NewValue'] = df_to_display['NewValue'].astype(str)
+
+                st.write(f"Found {len(df_to_display)} log entries for the selected filter.")
+                st.dataframe(df_to_display)
+            else:
+                st.info("No log data found for the selected Opportunity Name.")
+
+        else:
+            st.warning("No activity log has been recorded yet.")
