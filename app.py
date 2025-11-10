@@ -48,7 +48,7 @@ def format_number(number):
 # GET ALL MASTER DATA
 # ==============================================================================
 
-@st.cache_data(ttl=600) # Data akan di-cache selama 7 menit (450 detik)
+@st.cache_data(ttl=900) # Data akan di-cache selama 15 menit (900 detik)
 def get_master(action: str):
     """
     Mengambil semua data dari sheet 'OBSERVERS' dari API Apps Script.
@@ -204,16 +204,12 @@ def clean_data_for_display(data):
     df = pd.DataFrame(data)
 
     desired_order = [
-        'uid', 'presales_name', 'responsible_name', 'opportunity_name', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'notes', 'salesgroup_id','sales_name', 'start_date'
-    ]
+        'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'opportunity_name', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'stage', 'notes']
     # Filter hanya kolom yang ada di data
     existing_columns_in_order = [col for col in desired_order if col in df.columns]
     
-    # Dapatkan kolom yang tersisa
-    remaining_columns = [col for col in df.columns if col not in existing_columns_in_order]
-    
     # Gabungkan
-    df = df[existing_columns_in_order + remaining_columns]
+    df = df[existing_columns_in_order]
 
     # Konversi ke numerik dulu, penting untuk sorting jika diperlukan
     for col in ['cost', 'selling_price']:
