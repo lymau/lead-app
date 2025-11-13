@@ -198,31 +198,43 @@ def update_full_opportunity(lead_data):
         return None
 
 def clean_data_for_display(data):
-    """Membersihkan, mengatur ulang, dan MEMFORMAT KOLOM ANGKA untuk ditampilkan."""
+    """Membersihkan, mengatur ulang, dan MEMFORMAT KOLOM untuk ditampilkan."""
     if not data:
         return pd.DataFrame()
     df = pd.DataFrame(data)
 
     desired_order = [
         'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'stage', 'notes', 'created_at', 'updated_at']
-    # Filter hanya kolom yang ada di data
-    existing_columns_in_order = [col for col in desired_order if col in df.columns]
     
-    # Gabungkan
+    existing_columns_in_order = [col for col in desired_order if col in df.columns]
     df = df[existing_columns_in_order]
 
-    # Konversi ke numerik dulu, penting untuk sorting jika diperlukan
-    for col in ['cost', 'selling_price']:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+    # --- MULAI PERUBAHAN ---
 
-    # Gunakan Styler untuk memformat tampilan tanpa mengubah tipe data asli
-    styler = df.style
+    # 1. Format Kolom Angka (Cost, Selling Price)
     for col in ['cost', 'selling_price']:
         if col in df.columns:
-            styler = styler.format({col: lambda x: f"Rp {format_number(x)}"})
+            # Konversi ke numerik, lalu format sebagai string "Rp ..."
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            df[col] = df[col].apply(lambda x: f"Rp {format_number(x)}")
+
+    # 2. Format Kolom Tanggal (start_date, created_at, updated_at)
+    for date_col in ['start_date', 'created_at', 'updated_at']:
+        if date_col in df.columns:
+            # Konversi ke datetime, tangani error jika ada format yang salah
+            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
             
-    return styler
+            # Terapkan format yang Anda minta (DD-MM-YYYY)
+            if date_col == 'start_date':
+                df[date_col] = df[date_col].dt.strftime('%d-%m-%Y')
+            else:
+                # Format log/timestamp agar lebih rapi
+                df[date_col] = df[date_col].dt.strftime('%d-%m-%Y %H:%M')
+            
+            # Ganti NaT (Not a Time) / tanggal error dengan string kosong
+            df[date_col] = df[date_col].replace('NaT', '', regex=False)
+
+    return df # <-- KEMBALIKAN DataFrame, BUKAN Styler
 
 def get_all_leads():
     """
