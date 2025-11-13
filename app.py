@@ -209,8 +209,6 @@ def clean_data_for_display(data):
     existing_columns_in_order = [col for col in desired_order if col in df.columns]
     df = df[existing_columns_in_order]
 
-    # --- MULAI PERUBAHAN ---
-
     # 1. Format Kolom Angka (Cost, Selling Price)
     for col in ['cost', 'selling_price']:
         if col in df.columns:
@@ -221,20 +219,32 @@ def clean_data_for_display(data):
     # 2. Format Kolom Tanggal (start_date, created_at, updated_at)
     for date_col in ['start_date', 'created_at', 'updated_at']:
         if date_col in df.columns:
-            # Konversi ke datetime, tangani error jika ada format yang salah
-            df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
             
-            # Terapkan format yang Anda minta (DD-MM-YYYY)
             if date_col == 'start_date':
+                # --- Untuk start_date, kita tidak perlu konversi TZ ---
+                # Kita hanya ingin memformat tanggalnya saja
+                df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
                 df[date_col] = df[date_col].dt.strftime('%d-%m-%Y')
+            
             else:
-                # Format log/timestamp agar lebih rapi
-                df[date_col] = df[date_col].dt.strftime('%d-%m-%Y %H:%M')
+                # --- Untuk created_at & updated_at (Timestamp) ---
+                
+                # 1. Konversi ke datetime. 
+                #    `utc=True` akan menstandarisasi semua timestamp ke UTC.
+                #    Ini akan membaca '...Z' sebagai UTC dan mengasumsikan 
+                #    timestamp tanpa TZ sebagai UTC.
+                df[date_col] = pd.to_datetime(df[date_col], errors='coerce', utc=True)
+                
+                # 2. Konversi dari UTC ke GMT+7 (WIB / Asia/Jakarta)
+                df[date_col] = df[date_col].dt.tz_convert('Asia/Jakarta')
+                
+                # 3. Format ke string yang Anda inginkan (DD-MM-YYYY HH:MM)
+                df[date_col] = df[date_col].dt.strftime('%d-%m-%Y %H:%M') 
             
             # Ganti NaT (Not a Time) / tanggal error dengan string kosong
-            df[date_col] = df[date_col].replace('NaT', '', regex=False)
+            df[date_col] = df[date_col].replace('NaT', '', regex=False).replace('NaT NaT', '')
 
-    return df # <-- KEMBALIKAN DataFrame, BUKAN Styler
+    return df
 
 def get_all_leads():
     """
