@@ -204,7 +204,7 @@ def clean_data_for_display(data):
     df = pd.DataFrame(data)
 
     desired_order = [
-        'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'company_name' 'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'stage', 'notes', 'created_at', 'updated_at']
+        'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'company_name', 'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'stage', 'notes', 'created_at', 'updated_at']
     
     existing_columns_in_order = [col for col in desired_order if col in df.columns]
     df = df[existing_columns_in_order]
