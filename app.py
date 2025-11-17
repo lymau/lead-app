@@ -29,7 +29,7 @@ if not st.session_state.update_dismissed_v1_5: # <-- DIUBAH
         * **Fokus pada Biaya:** Setiap kartu di Kanban sekarang menampilkan **Total Cost** (Lump Sum) dari opportunity tersebut.
         * **Drill-Down Detail:** Klik tombol **"View Details"** pada kartu untuk melihat ringkasan info dan tabel rincian semua solusinya.
         
-        ---
+        ----
         
         *Peningkatan sebelumnya (v1.4):*
         * **📜 Activity Log:** Tab 'Activity Log' ditambahkan untuk melacak semua riwayat perubahan data.
