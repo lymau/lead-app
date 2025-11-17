@@ -13,28 +13,34 @@ st.set_page_config(
 )
 
 # Inisialisasi session state untuk mengingat apakah notifikasi sudah ditutup
-if 'update_dismissed_v1_4' not in st.session_state:
-    st.session_state.update_dismissed_v1_4 = False
+if 'update_dismissed_v1_5' not in st.session_state:  # <-- DIUBAH
+    st.session_state.update_dismissed_v1_5 = False # <-- DIUBAH
 
 # Tampilkan notifikasi hanya jika belum ditutup
-if not st.session_state.update_dismissed_v1_4:
+if not st.session_state.update_dismissed_v1_5: # <-- DIUBAH
     with st.container(border=True):
-        st.subheader("🚀 Update Terbaru Aplikasi! (v1.4)")
+        st.subheader("🚀 Update Terbaru Aplikasi! (v1.5)") # <-- DIUBAH
         st.markdown("""
-        #### 📜 Lacak Semua Perubahan dengan Activity Log!
-        Kini tersedia tab baru **'Activity Log'** untuk melihat riwayat semua penambahan dan perubahan data. Anda juga bisa memfilter log berdasarkan *Opportunity Name*.
+        #### 📊 Tampilan Baru: Kanban View Menggantikan "View Opportunities"!
+        
+        Tab "View Opportunities" yang lama telah diganti dengan **Kanban View** baru yang lebih visual dan fungsional.
+        
+        * **Tampilan Visual Pipeline:** Lihat semua opportunity Anda dalam 3 kolom: **Open**, **Closed Won**, & **Closed Lost**.
+        * **Fokus pada Biaya:** Setiap kartu di Kanban sekarang menampilkan **Total Cost** (Lump Sum) dari opportunity tersebut.
+        * **Drill-Down Detail:** Klik tombol **"View Details"** pada kartu untuk melihat ringkasan info dan tabel rincian semua solusinya.
         
         ---
         
-        *Peningkatan sebelumnya (v1.3):*
-        * **Fitur Keterbacaan Angka:** Anda bisa melihat format Rupiah (`Rp 1.000.000`) secara langsung di bawah kolom **Cost** pada tab "Add Opportunity" dan "Update Opportunity". Cukup tekan **Enter** setelah mengetik.
+        *Peningkatan sebelumnya (v1.4):*
+        * **📜 Activity Log:** Tab 'Activity Log' ditambahkan untuk melacak semua riwayat perubahan data.
+        * **Fitur Keterbacaan Angka (v1.3):** Format Rupiah di bawah kolom Cost.
         """)
         
         # Buat tombol untuk menutup notifikasi
-        if st.button("Tutup Pemberitahuan Ini", key="dismiss_update_v1_4"):
-            st.session_state.update_dismissed_v1_4 = True
+        if st.button("Dismiss", key="dismiss_update_v1_5"): # <-- DIUBAH
+            st.session_state.update_dismissed_v1_5 = True # <-- DIUBAH
             st.rerun()
-    st.markdown("---") # Garis pemisah
+    st.markdown("---")
     
 def format_number(number):
     """Mengubah angka menjadi string dengan pemisah titik."""
@@ -199,14 +205,32 @@ def update_full_opportunity(lead_data):
 
 def clean_data_for_display(data):
     """Membersihkan, mengatur ulang, dan MEMFORMAT KOLOM untuk ditampilkan."""
-    if not data:
+    
+    # --- START PERBAIKAN ---
+    # Cek dulu apakah inputnya sudah DataFrame (dari Kanban Detail)
+    if isinstance(data, pd.DataFrame):
+        if data.empty:
+            return pd.DataFrame()
+        df = data # Langsung gunakan, tidak perlu konversi
+    
+    # Cek apakah inputnya list kosong (dari API call biasa)
+    elif not data: # Ini aman untuk list
         return pd.DataFrame()
-    df = pd.DataFrame(data)
+    
+    # Jika inputnya adalah list (dari API call), konversi ke DataFrame
+    else:
+        df = pd.DataFrame(data)
+    # --- AKHIR PERBAIKAN ---
 
     desired_order = [
         'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'company_name', 'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'stage', 'notes', 'created_at', 'updated_at']
     
     existing_columns_in_order = [col for col in desired_order if col in df.columns]
+    
+    # Hindari error jika DataFrame kosong setelah difilter
+    if not existing_columns_in_order:
+        return pd.DataFrame()
+        
     df = df[existing_columns_in_order]
 
     # 1. Format Kolom Angka (Cost, Selling Price)
@@ -221,27 +245,14 @@ def clean_data_for_display(data):
         if date_col in df.columns:
             
             if date_col == 'start_date':
-                # --- Untuk start_date, kita tidak perlu konversi TZ ---
-                # Kita hanya ingin memformat tanggalnya saja
                 df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
                 df[date_col] = df[date_col].dt.strftime('%d-%m-%Y')
             
             else:
-                # --- Untuk created_at & updated_at (Timestamp) ---
-                
-                # 1. Konversi ke datetime. 
-                #    `utc=True` akan menstandarisasi semua timestamp ke UTC.
-                #    Ini akan membaca '...Z' sebagai UTC dan mengasumsikan 
-                #    timestamp tanpa TZ sebagai UTC.
                 df[date_col] = pd.to_datetime(df[date_col], errors='coerce', utc=True)
-                
-                # 2. Konversi dari UTC ke GMT+7 (WIB / Asia/Jakarta)
                 df[date_col] = df[date_col].dt.tz_convert('Asia/Jakarta')
-                
-                # 3. Format ke string yang Anda inginkan (DD-MM-YYYY HH:MM)
                 df[date_col] = df[date_col].dt.strftime('%d-%m-%Y %H:%M') 
             
-            # Ganti NaT (Not a Time) / tanggal error dengan string kosong
             df[date_col] = df[date_col].replace('NaT', '', regex=False).replace('NaT NaT', '')
 
     return df
@@ -347,17 +358,16 @@ st.markdown("---")
 # Tab navigasi
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Add Opportunity", "View Opportunities", "Search Opportunity", "Update Opportunity", "Edit Opportunity", "Activity Log"])
 
-# Inisialisasi session state untuk menyimpan product lines
-if 'product_lines' not in st.session_state:
-    st.session_state.product_lines = [{"id": 0}]
-if 'submission_message' not in st.session_state:
-    st.session_state.submission_message = None
-if 'new_uids' not in st.session_state:
-    st.session_state.new_uids = None
-if 'edit_submission_message' not in st.session_state:
-    st.session_state.edit_submission_message = None
-if 'edit_new_uid' not in st.session_state:
-    st.session_state.edit_new_uid = None
+# Inisialisasi session state
+if 'product_lines' not in st.session_state: st.session_state.product_lines = [{"id": 0}]
+if 'submission_message' not in st.session_state: st.session_state.submission_message = None
+if 'new_uids' not in st.session_state: st.session_state.new_uids = None
+if 'edit_submission_message' not in st.session_state: st.session_state.edit_submission_message = None
+if 'edit_new_uid' not in st.session_state: st.session_state.edit_new_uid = None
+
+# Tambahan untuk Kanban View (Tab 2)
+if 'selected_kanban_opp_id' not in st.session_state: st.session_state.selected_kanban_opp_id = None
+if 'kanban_form_message' not in st.session_state: st.session_state.kanban_form_message = None
 
 with tab1:
     st.header("Add New Opportunity (Multi-Solution)")
@@ -582,21 +592,153 @@ with tab1:
 
 
 with tab2:
-    st.header("All Opportunities Data")
-    if st.button("Refresh Opportunities"):
-        with st.spinner("Fetching all opportunities..."):
-            response = get_all_leads()
-            if response and response.get("status") == 200:
-                leads_data = response.get("data")
-                if leads_data:
-                    st.write(f"Found {len(leads_data)} opportunities.")
-                    cleaned_df = clean_data_for_display(leads_data)
-                    st.dataframe(cleaned_df)
+    st.header("Kanban View by Opportunity Stage")
+    
+    # 1. Ambil data 'leads' (detail)
+    with st.spinner("Fetching all leads data for Kanban..."):
+        all_leads_response = get_all_leads()
+        
+    if not all_leads_response or all_leads_response.get("status") != 200:
+        st.error("Could not fetch leads data from API.")
+    else:
+        raw_all_leads_data = all_leads_response.get("data", [])
+
+        if not raw_all_leads_data:
+            st.info("No data found to display.")
+        else:
+            # PENTING: Kita buat df_master dari data mentah, BUKAN dari clean_data_for_display
+            # agar kita bisa menjumlahkan 'cost' sebagai angka.
+            df_master = pd.DataFrame(raw_all_leads_data)
+
+            # =============================================================
+            # ▼▼▼ LOGIKA KANBAN BARU UNTUK PRESALES APP ▼▼▼
+            # =============================================================
+            
+            # --- 1. LOGIKA NAVIGASI (DETAIL VIEW) --------------------
+            if st.session_state.selected_kanban_opp_id:
+                
+                selected_id = st.session_state.selected_kanban_opp_id
+                
+                # Tombol "Back"
+                if st.button("⬅️ Back to Kanban View"):
+                    st.session_state.selected_kanban_opp_id = None
+                    if 'kanban_form_message' in st.session_state: del st.session_state.kanban_form_message
+                    st.rerun()
+                
+                opportunity_details_df = df_master[df_master['opportunity_id'] == selected_id]
+                
+                if opportunity_details_df.empty:
+                    st.error(f"Could not find solution details for {selected_id}.")
                 else:
-                    st.info("No opportunities found.")
+                    # Ambil data dari baris pertama untuk ringkasan
+                    lead_data = opportunity_details_df.iloc[0].to_dict()
+                    opp_name = lead_data.get('opportunity_name', 'N/A')
+                    company_name = lead_data.get('company_name', 'N/A')
+                    
+                    st.header(f"Detail for: {opp_name}")
+                    st.subheader(f"Client: {company_name}")
+                    
+                    # BLOK INFO RINGKASAN
+                    st.markdown("---")
+                    st.subheader("Opportunity Summary")
+                    col1, col2 = st.columns(2)
+                    
+                    start_date_str = lead_data.get('start_date', 'N/A')
+                    try:
+                        # Ubah string (misal: 2025-07-01T...Z) ke datetime
+                        start_date_obj = pd.to_datetime(start_date_str)
+                        # Format ulang ke DD-MM-YYYY
+                        formatted_start_date = start_date_obj.strftime('%d-%m-%Y')
+                    except Exception:
+                        formatted_start_date = 'N/A'
+                    
+                    with col1:
+                        st.markdown(f"👤 **Inputter:** {lead_data.get('presales_name', 'N/A')}")
+                        st.markdown(f"🧑‍💼 **Presales Account Manager:** {lead_data.get('responsible_name', 'N/A')}")
+                        st.markdown(f"🗓️ **Start Date:** {formatted_start_date}")
+                        st.markdown(f"🏷️ **Brand:** {lead_data.get('brand', 'N/A')}")
+                    with col2:
+                        st.markdown(f"📡 **Company:** {lead_data.get('company_name', 'N/A')}")
+                        st.markdown(f"🏭 **Vertical Industry:** {lead_data.get('vertical_industry', 'N/A')}") 
+                        st.markdown(f"ℹ️ **Stage:** {lead_data.get('stage', 'N/A')}")
+                        st.markdown(f"🆔 **Opportunity ID:** {lead_data.get('opportunity_id', 'N/A')}")
+                    st.markdown("---")
+
+                    # ▼▼▼ PERUBAHAN DI SINI ▼▼▼
+                    # GANTI FORM DENGAN DATAFRAME DETAIL
+                    
+                    st.subheader("Solution Details")
+                    
+                    # Tampilkan dataframe dari opportunity_details_df
+                    # Kita gunakan fungsi clean_data_for_display yang sudah ada
+                    # Ini akan otomatis memformat 'cost' dan tanggal
+                    st.dataframe(clean_data_for_display(opportunity_details_df))
+                    
+                    # ▲▲▲ BLOK FORM UPDATE COST & NOTES SUDAH DIHAPUS ▲▲▲
+
+            # --- 2. TAMPILAN KANBAN (MAIN VIEW) ----------------------
             else:
-                st.error(response.get("message", "Failed to fetch all opportunities."))
-                st.json(response)
+                st.markdown("Displaying unique data per opportunity with total cost. Click 'View Details' on the card.")
+
+                # Pastikan kolom cost dan stage ada dan berformat numerik
+                if 'cost' not in df_master.columns:
+                    df_master['cost'] = 0
+                df_master['cost'] = pd.to_numeric(df_master['cost'], errors='coerce').fillna(0)
+                
+                # Hitung total 'cost'
+                df_sums = df_master.groupby('opportunity_id')['cost'].sum().reset_index()
+                
+                # Ambil data unik
+                df_details = df_master.drop_duplicates(subset=['opportunity_id'], keep='first')
+                
+                # Gabungkan
+                if 'cost' in df_details.columns:
+                    df_details = df_details.drop(columns=['cost'])
+                df_opps = pd.merge(df_details, df_sums, on='opportunity_id', how='left')
+
+                if 'stage' not in df_opps.columns:
+                    df_opps['stage'] = 'Open' # Default 'Open' jika kolom stage tidak ada
+                
+                df_opps['stage'] = df_opps['stage'].fillna('Open')
+                open_opps = df_opps[df_opps['stage'] == 'Open']
+                won_opps = df_opps[df_opps['stage'] == 'Closed Won']
+                lost_opps = df_opps[df_opps['stage'] == 'Closed Lost']
+
+                col1, col2, col3 = st.columns(3)
+
+                # Fungsi helper untuk render kartu
+                def render_kanban_card(row):
+                    with st.container(border=True):
+                        st.markdown(f"**{row.get('opportunity_name', 'N/A')}**")
+                        st.markdown(f"*{row.get('company_name', 'N/A')}*")
+                        st.write(f"Inputter: {row.get('presales_name', 'N/A')}")
+                        # Tampilkan Total COST
+                        price = int(row.get('cost', 0) or 0)
+                        st.markdown(f"**Total Cost: {price:,}**")
+                        st.caption(f"ID: {row.get('opportunity_id', 'N/A')}")
+                        
+                        opp_id = row.get('opportunity_id')
+                        if st.button(f"View Details", key=f"btn_detail_{opp_id}"):
+                            st.session_state.selected_kanban_opp_id = opp_id
+                            st.rerun()
+
+                with col1:
+                    st.markdown(f"### 🧊 Open ({len(open_opps)})")
+                    st.markdown("---")
+                    for _, row in open_opps.iterrows():
+                        render_kanban_card(row)
+
+                with col2:
+                    st.markdown(f"### ✅ Closed Won ({len(won_opps)})")
+                    st.markdown("---")
+                    for _, row in won_opps.iterrows():
+                        render_kanban_card(row)
+
+                with col3:
+                    st.markdown(f"### ❌ Closed Lost ({len(lost_opps)})")
+                    st.markdown("---")
+                    for _, row in lost_opps.iterrows():
+                        render_kanban_card(row)
 
 with tab3:
     st.header("Search Opportunities")
