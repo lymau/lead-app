@@ -619,6 +619,7 @@ with tab2:
             pam_options = sorted(df_master['responsible_name'].dropna().unique().tolist())
             group_options = sorted(df_master['salesgroup_id'].dropna().unique().tolist())
 
+            # Tampilkan widget filter
             f_col1, f_col2, f_col3 = st.columns(3)
             with f_col1:
                 selected_inputters = st.multiselect(
