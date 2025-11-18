@@ -606,12 +606,51 @@ with tab2:
         if not raw_all_leads_data:
             st.info("No data found to display.")
         else:
-            # PENTING: Kita buat df_master dari data mentah, BUKAN dari clean_data_for_display
-            # agar kita bisa menjumlahkan 'cost' sebagai angka.
             df_master = pd.DataFrame(raw_all_leads_data)
 
             # =============================================================
-            # ▼▼▼ LOGIKA KANBAN BARU UNTUK PRESALES APP ▼▼▼
+            # ▼▼▼ BLOK FILTER BARU ▼▼▼
+            # =============================================================
+            st.markdown("---")
+            st.subheader("Filters")
+            
+            # Ambil opsi filter dari df_master
+            inputter_options = sorted(df_master['presales_name'].dropna().unique().tolist())
+            pam_options = sorted(df_master['responsible_name'].dropna().unique().tolist())
+            group_options = sorted(df_master['salesgroup_id'].dropna().unique().tolist())
+
+            f_col1, f_col2, f_col3 = st.columns(3)
+            with f_col1:
+                selected_inputters = st.multiselect(
+                    "Filter by Inputter", 
+                    inputter_options, 
+                    key="kanban_filter_inputter"
+                )
+            with f_col2:
+                selected_pams = st.multiselect(
+                    "Filter by Presales AM", 
+                    pam_options, 
+                    key="kanban_filter_pam"
+                )
+            with f_col3:
+                selected_groups = st.multiselect(
+                    "Filter by Sales Group", 
+                    group_options, 
+                    key="kanban_filter_group"
+                )
+
+            # Terapkan filter ke df_master
+            df_filtered = df_master.copy()
+            if selected_inputters:
+                df_filtered = df_filtered[df_filtered['presales_name'].isin(selected_inputters)]
+            if selected_pams:
+                df_filtered = df_filtered[df_filtered['responsible_name'].isin(selected_pams)]
+            if selected_groups:
+                df_filtered = df_filtered[df_filtered['salesgroup_id'].isin(selected_groups)]
+            
+            st.markdown("---")
+            # =============================================================
+            # ▼▼▼ LOGIKA KANBAN (SEKARANG MENGGUNAKAN 'df_filtered') ▼▼▼
             # =============================================================
             
             # --- 1. LOGIKA NAVIGASI (DETAIL VIEW) --------------------
@@ -619,18 +658,17 @@ with tab2:
                 
                 selected_id = st.session_state.selected_kanban_opp_id
                 
-                # Tombol "Back"
                 if st.button("⬅️ Back to Kanban View"):
                     st.session_state.selected_kanban_opp_id = None
                     if 'kanban_form_message' in st.session_state: del st.session_state.kanban_form_message
                     st.rerun()
                 
-                opportunity_details_df = df_master[df_master['opportunity_id'] == selected_id]
+                # Gunakan df_filtered untuk mengambil detail
+                opportunity_details_df = df_filtered[df_filtered['opportunity_id'] == selected_id]
                 
                 if opportunity_details_df.empty:
-                    st.error(f"Could not find solution details for {selected_id}.")
+                    st.error(f"Could not find solution details for {selected_id} (mungkin tersembunyi oleh filter).")
                 else:
-                    # Ambil data dari baris pertama untuk ringkasan
                     lead_data = opportunity_details_df.iloc[0].to_dict()
                     opp_name = lead_data.get('opportunity_name', 'N/A')
                     company_name = lead_data.get('company_name', 'N/A')
@@ -638,107 +676,96 @@ with tab2:
                     st.header(f"Detail for: {opp_name}")
                     st.subheader(f"Client: {company_name}")
                     
-                    # BLOK INFO RINGKASAN
                     st.markdown("---")
                     st.subheader("Opportunity Summary")
                     col1, col2 = st.columns(2)
                     
                     start_date_str = lead_data.get('start_date', 'N/A')
                     try:
-                        # Ubah string (misal: 2025-07-01T...Z) ke datetime
                         start_date_obj = pd.to_datetime(start_date_str)
-                        # Format ulang ke DD-MM-YYYY
                         formatted_start_date = start_date_obj.strftime('%d-%m-%Y')
                     except Exception:
-                        formatted_start_date = 'N/A'
-                    
+                        formatted_start_date = 'N/A' 
+
                     with col1:
                         st.markdown(f"👤 **Inputter:** {lead_data.get('presales_name', 'N/A')}")
                         st.markdown(f"🧑‍💼 **Presales Account Manager:** {lead_data.get('responsible_name', 'N/A')}")
-                        st.markdown(f"🗓️ **Start Date:** {formatted_start_date}")
+                        st.markdown(f"🗓️ **Start Date:** {formatted_start_date}") 
                         st.markdown(f"🏷️ **Brand:** {lead_data.get('brand', 'N/A')}")
                     with col2:
-                        st.markdown(f"📡 **Company:** {lead_data.get('company_name', 'N/A')}")
+                        st.markdown(f"🏢 **Company:** {lead_data.get('company_name', 'N/A')}")
                         st.markdown(f"🏭 **Vertical Industry:** {lead_data.get('vertical_industry', 'N/A')}") 
                         st.markdown(f"ℹ️ **Stage:** {lead_data.get('stage', 'N/A')}")
                         st.markdown(f"🆔 **Opportunity ID:** {lead_data.get('opportunity_id', 'N/A')}")
                     st.markdown("---")
 
-                    # ▼▼▼ PERUBAHAN DI SINI ▼▼▼
-                    # GANTI FORM DENGAN DATAFRAME DETAIL
-                    
                     st.subheader("Solution Details")
-                    
-                    # Tampilkan dataframe dari opportunity_details_df
-                    # Kita gunakan fungsi clean_data_for_display yang sudah ada
-                    # Ini akan otomatis memformat 'cost' dan tanggal
                     st.dataframe(clean_data_for_display(opportunity_details_df))
-                    
-                    # ▲▲▲ BLOK FORM UPDATE COST & NOTES SUDAH DIHAPUS ▲▲▲
 
             # --- 2. TAMPILAN KANBAN (MAIN VIEW) ----------------------
             else:
-                st.markdown("Displaying unique data per opportunity with total cost. Click 'View Details' on the card.")
+                # Cek jika df_filtered kosong setelah filter diterapkan
+                if df_filtered.empty:
+                    st.warning("No data matches your filter.")
+                else:
+                    st.markdown("Displaying unique data per opportunity with total cost. Click 'View Details' on the card.")
 
-                # Pastikan kolom cost dan stage ada dan berformat numerik
-                if 'cost' not in df_master.columns:
-                    df_master['cost'] = 0
-                df_master['cost'] = pd.to_numeric(df_master['cost'], errors='coerce').fillna(0)
-                
-                # Hitung total 'cost'
-                df_sums = df_master.groupby('opportunity_id')['cost'].sum().reset_index()
-                
-                # Ambil data unik
-                df_details = df_master.drop_duplicates(subset=['opportunity_id'], keep='first')
-                
-                # Gabungkan
-                if 'cost' in df_details.columns:
-                    df_details = df_details.drop(columns=['cost'])
-                df_opps = pd.merge(df_details, df_sums, on='opportunity_id', how='left')
+                    # Pastikan kolom cost dan stage ada
+                    if 'cost' not in df_filtered.columns:
+                        df_filtered['cost'] = 0
+                    df_filtered['cost'] = pd.to_numeric(df_filtered['cost'], errors='coerce').fillna(0)
+                    
+                    # Hitung total 'cost' dari data yang SUDAH DIFILTER
+                    df_sums = df_filtered.groupby('opportunity_id')['cost'].sum().reset_index()
+                    
+                    # Ambil data unik dari data yang SUDAH DIFILTER
+                    df_details = df_filtered.drop_duplicates(subset=['opportunity_id'], keep='first')
+                    
+                    if 'cost' in df_details.columns:
+                        df_details = df_details.drop(columns=['cost'])
+                    df_opps = pd.merge(df_details, df_sums, on='opportunity_id', how='left')
 
-                if 'stage' not in df_opps.columns:
-                    df_opps['stage'] = 'Open' # Default 'Open' jika kolom stage tidak ada
-                
-                df_opps['stage'] = df_opps['stage'].fillna('Open')
-                open_opps = df_opps[df_opps['stage'] == 'Open']
-                won_opps = df_opps[df_opps['stage'] == 'Closed Won']
-                lost_opps = df_opps[df_opps['stage'] == 'Closed Lost']
+                    if 'stage' not in df_opps.columns:
+                        df_opps['stage'] = 'Open'
+                    
+                    df_opps['stage'] = df_opps['stage'].fillna('Open')
+                    open_opps = df_opps[df_opps['stage'] == 'Open']
+                    won_opps = df_opps[df_opps['stage'] == 'Closed Won']
+                    lost_opps = df_opps[df_opps['stage'] == 'Closed Lost']
 
-                col1, col2, col3 = st.columns(3)
+                    col1, col2, col3 = st.columns(3)
 
-                # Fungsi helper untuk render kartu
-                def render_kanban_card(row):
-                    with st.container(border=True):
-                        st.markdown(f"**{row.get('opportunity_name', 'N/A')}**")
-                        st.markdown(f"*{row.get('company_name', 'N/A')}*")
-                        st.write(f"Inputter: {row.get('presales_name', 'N/A')}")
-                        # Tampilkan Total COST
-                        price = int(row.get('cost', 0) or 0)
-                        st.markdown(f"**Total Cost: {price:,}**")
-                        st.caption(f"ID: {row.get('opportunity_id', 'N/A')}")
-                        
-                        opp_id = row.get('opportunity_id')
-                        if st.button(f"View Details", key=f"btn_detail_{opp_id}"):
-                            st.session_state.selected_kanban_opp_id = opp_id
-                            st.rerun()
+                    def render_kanban_card(row):
+                        with st.container(border=True):
+                            st.markdown(f"**{row.get('opportunity_name', 'N/A')}**")
+                            st.markdown(f"*{row.get('company_name', 'N/A')}*")
+                            st.write(f"Inputter: {row.get('presales_name', 'N/A')}")
+                            price = int(row.get('cost', 0) or 0)
+                            st.markdown(f"**Total Cost: {price:,}**")
+                            st.caption(f"ID: {row.get('opportunity_id', 'N/A')}")
+                            
+                            opp_id = row.get('opportunity_id')
+                            if st.button(f"View Details", key=f"btn_detail_{opp_id}"):
+                                st.session_state.selected_kanban_opp_id = opp_id
+                                st.rerun()
 
-                with col1:
-                    st.markdown(f"### 🧊 Open ({len(open_opps)})")
-                    st.markdown("---")
-                    for _, row in open_opps.iterrows():
-                        render_kanban_card(row)
+                    with col1:
+                        st.markdown(f"### 🧊 Open ({len(open_opps)})")
+                        st.markdown("---")
+                        for _, row in open_opps.iterrows():
+                            render_kanban_card(row)
 
-                with col2:
-                    st.markdown(f"### ✅ Closed Won ({len(won_opps)})")
-                    st.markdown("---")
-                    for _, row in won_opps.iterrows():
-                        render_kanban_card(row)
+                    with col2:
+                        st.markdown(f"### ✅ Closed Won ({len(won_opps)})")
+                        st.markdown("---")
+                        for _, row in won_opps.iterrows():
+                            render_kanban_card(row)
 
-                with col3:
-                    st.markdown(f"### ❌ Closed Lost ({len(lost_opps)})")
-                    st.markdown("---")
-                    for _, row in lost_opps.iterrows():
-                        render_kanban_card(row)
+                    with col3:
+                        st.markdown(f"### ❌ Closed Lost ({len(lost_opps)})")
+                        st.markdown("---")
+                        for _, row in lost_opps.iterrows():
+                            render_kanban_card(row)
 
 with tab3:
     st.header("Search Opportunities")
