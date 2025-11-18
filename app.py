@@ -740,6 +740,7 @@ with tab2:
                         with st.container(border=True):
                             st.markdown(f"**{row.get('opportunity_name', 'N/A')}**")
                             st.markdown(f"*{row.get('company_name', 'N/A')}*")
+                            st.write(f"Sales Name: {row.get('sales_name', 'N/A')}")
                             st.write(f"Inputter: {row.get('presales_name', 'N/A')}")
                             price = int(row.get('cost', 0) or 0)
                             st.markdown(f"**Total Cost: {price:,}**")
