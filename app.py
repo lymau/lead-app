@@ -463,6 +463,11 @@ with tab1:
                     st.rerun()
 
             line_col1, line_col2 = st.columns(2)
+            st.info(
+            "**Reminder:** If one of your solutions requires support, please remember to add it as 'Another Solution' (e.g., 'Implementation Support' or 'Maintenance Support')."
+        )
+    
+            st.markdown("---")
             with line_col1:
                 line['pillar'] = st.selectbox("Pillar", get_pillars(), key=f"pillar_{line['id']}")
                 solution_options = get_solutions(line['pillar'])
