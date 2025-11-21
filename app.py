@@ -748,7 +748,6 @@ with tab2:
                     total_cost_open = open_opps['cost'].sum()
                     total_cost_won = won_opps['cost'].sum()
                     total_cost_lost = lost_opps['cost'].sum()
-                    # ▲▲▲ AKHIR PERHITUNGAN ▲▲▲
 
                     col1, col2, col3 = st.columns(3)
 
