@@ -712,32 +712,43 @@ with tab2:
             else:
                 # Cek jika df_filtered kosong setelah filter diterapkan
                 if df_filtered.empty:
-                    st.warning("No data matches your filter.")
+                    st.warning("Tidak ada data yang cocok dengan filter Anda.")
                 else:
-                    st.markdown("Displaying unique data per opportunity with total cost. Click 'View Details' on the card.")
+                    st.markdown("Menampilkan data unik per opportunity dengan **total biaya (cost)**. Klik 'View Details' pada kartu.")
 
                     # Pastikan kolom cost dan stage ada
                     if 'cost' not in df_filtered.columns:
                         df_filtered['cost'] = 0
                     df_filtered['cost'] = pd.to_numeric(df_filtered['cost'], errors='coerce').fillna(0)
                     
-                    # Hitung total 'cost' dari data yang SUDAH DIFILTER
+                    # 1. Hitung total 'cost' per opportunity (Lump Sum per Opp)
+                    #    Ini penting agar cost tidak terhitung ganda saat di-merge nanti
                     df_sums = df_filtered.groupby('opportunity_id')['cost'].sum().reset_index()
                     
-                    # Ambil data unik dari data yang SUDAH DIFILTER
+                    # 2. Ambil data unik per opportunity
                     df_details = df_filtered.drop_duplicates(subset=['opportunity_id'], keep='first')
                     
                     if 'cost' in df_details.columns:
                         df_details = df_details.drop(columns=['cost'])
+                    
+                    # 3. Gabungkan kembali -> df_opps sekarang berisi 1 baris per Opportunity dengan Total Cost-nya
                     df_opps = pd.merge(df_details, df_sums, on='opportunity_id', how='left')
 
                     if 'stage' not in df_opps.columns:
                         df_opps['stage'] = 'Open'
                     
                     df_opps['stage'] = df_opps['stage'].fillna('Open')
+
+                    # 4. Pisahkan data berdasarkan stage
                     open_opps = df_opps[df_opps['stage'] == 'Open']
                     won_opps = df_opps[df_opps['stage'] == 'Closed Won']
                     lost_opps = df_opps[df_opps['stage'] == 'Closed Lost']
+
+                    # ▼▼▼ 5. HITUNG TOTAL COST PER STAGE ▼▼▼
+                    total_cost_open = open_opps['cost'].sum()
+                    total_cost_won = won_opps['cost'].sum()
+                    total_cost_lost = lost_opps['cost'].sum()
+                    # ▲▲▲ AKHIR PERHITUNGAN ▲▲▲
 
                     col1, col2, col3 = st.columns(3)
 
@@ -745,7 +756,6 @@ with tab2:
                         with st.container(border=True):
                             st.markdown(f"**{row.get('opportunity_name', 'N/A')}**")
                             st.markdown(f"*{row.get('company_name', 'N/A')}*")
-                            st.write(f"Sales Name: {row.get('sales_name', 'N/A')}")
                             st.write(f"Inputter: {row.get('presales_name', 'N/A')}")
                             price = int(row.get('cost', 0) or 0)
                             st.markdown(f"**Total Cost: {price:,}**")
@@ -758,18 +768,24 @@ with tab2:
 
                     with col1:
                         st.markdown(f"### 🧊 Open ({len(open_opps)})")
+                        # Tampilkan Total Cost Open
+                        st.markdown(f"**Rp {format_number(total_cost_open)}**") 
                         st.markdown("---")
                         for _, row in open_opps.iterrows():
                             render_kanban_card(row)
 
                     with col2:
                         st.markdown(f"### ✅ Closed Won ({len(won_opps)})")
+                        # Tampilkan Total Cost Won
+                        st.markdown(f"**Rp {format_number(total_cost_won)}**")
                         st.markdown("---")
                         for _, row in won_opps.iterrows():
                             render_kanban_card(row)
 
                     with col3:
                         st.markdown(f"### ❌ Closed Lost ({len(lost_opps)})")
+                        # Tampilkan Total Cost Lost
+                        st.markdown(f"**Rp {format_number(total_cost_lost)}**")
                         st.markdown("---")
                         for _, row in lost_opps.iterrows():
                             render_kanban_card(row)
