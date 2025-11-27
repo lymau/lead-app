@@ -13,13 +13,13 @@ st.set_page_config(
 )
 
 # Inisialisasi session state untuk mengingat apakah notifikasi sudah ditutup
-if 'update_dismissed_v1_5' not in st.session_state:  # <-- DIUBAH
-    st.session_state.update_dismissed_v1_5 = False # <-- DIUBAH
+if 'update_dismissed_v1_5' not in st.session_state:
+    st.session_state.update_dismissed_v1_5 = False
 
 # Tampilkan notifikasi hanya jika belum ditutup
-if not st.session_state.update_dismissed_v1_5: # <-- DIUBAH
+if not st.session_state.update_dismissed_v1_5:
     with st.container(border=True):
-        st.subheader("🚀 Update Terbaru Aplikasi! (v1.5)") # <-- DIUBAH
+        st.subheader("🚀 Update Terbaru Aplikasi! (v1.5)")
         st.markdown("""
         #### 📊 Tampilan Baru: Kanban View Menggantikan "View Opportunities"!
         
@@ -37,8 +37,8 @@ if not st.session_state.update_dismissed_v1_5: # <-- DIUBAH
         """)
         
         # Buat tombol untuk menutup notifikasi
-        if st.button("Dismiss", key="dismiss_update_v1_5"): # <-- DIUBAH
-            st.session_state.update_dismissed_v1_5 = True # <-- DIUBAH
+        if st.button("Dismiss", key="dismiss_update_v1_5"):
+            st.session_state.update_dismissed_v1_5 = True
             st.rerun()
     st.markdown("---")
     
@@ -119,7 +119,6 @@ def get_sales_name_by_sales_group(sales_group):
 
 def get_activity_log():
     """Mengambil semua data log aktivitas dari API Apps Script."""
-    # Kita bisa gunakan ulang fungsi get_master karena polanya sama
     return get_master('getActivityLog')
 
 def get_pam_mapping_dict():
@@ -206,28 +205,24 @@ def update_full_opportunity(lead_data):
 def clean_data_for_display(data):
     """Membersihkan, mengatur ulang, dan MEMFORMAT KOLOM untuk ditampilkan."""
     
-    # --- START PERBAIKAN ---
-    # Cek dulu apakah inputnya sudah DataFrame (dari Kanban Detail)
+    
     if isinstance(data, pd.DataFrame):
         if data.empty:
             return pd.DataFrame()
-        df = data # Langsung gunakan, tidak perlu konversi
+        df = data
     
-    # Cek apakah inputnya list kosong (dari API call biasa)
-    elif not data: # Ini aman untuk list
+
+    elif not data:
         return pd.DataFrame()
     
-    # Jika inputnya adalah list (dari API call), konversi ke DataFrame
     else:
         df = pd.DataFrame(data)
-    # --- AKHIR PERBAIKAN ---
 
     desired_order = [
         'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'company_name', 'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'stage', 'notes', 'created_at', 'updated_at']
     
     existing_columns_in_order = [col for col in desired_order if col in df.columns]
     
-    # Hindari error jika DataFrame kosong setelah difilter
     if not existing_columns_in_order:
         return pd.DataFrame()
         
@@ -381,7 +376,6 @@ with tab1:
     
     parent_col1, parent_col2 = st.columns(2)
     with parent_col1:
-        # KOREKSI: Implementasi penuh logika PAM otomatis/fleksibel
         presales_name_obj = st.selectbox("Inputter", get_master('getPresales'), format_func=lambda x: x.get("PresalesName", "Unknown"), key="parent_presales_name")
         selected_inputter_name = presales_name_obj.get("PresalesName", "") if presales_name_obj else ""
         
@@ -529,16 +523,13 @@ with tab1:
                 item.get("PresalesName"): item.get("Email") 
                 for item in all_presales_data if item.get("PresalesName") and item.get("Email")
             }
-            presales_options = sorted(list(presales_name_to_email_map.keys())) # Urutkan nama agar mudah dicari
+            presales_options = sorted(list(presales_name_to_email_map.keys()))
         except Exception as e:
-            # Jika ada error saat memproses data, tampilkan peringatan
             st.warning(f"Error processing Presales data: {e}")
     else:
-        # Jika data tidak berhasil dimuat sama sekali
         st.warning("Unable to load Presales list. Email notification feature will not be available.")
 
-    # 3. Tampilkan st.multiselect. Ini akan selalu muncul.
-    # Jika presales_options kosong, widget akan muncul tapi tidak ada pilihan.
+    # 3. Tampilkan st.multiselect.
     selected_presales_names = st.multiselect(
         "Tag Presales for Push Notification (Optional)",
         options=presales_options,
@@ -550,7 +541,7 @@ with tab1:
         list_of_emails = [presales_name_to_email_map.get(name) for name in selected_presales_names if presales_name_to_email_map.get(name)]
 
 
-    # 5. Tombol submit dan logikanya (tidak ada perubahan di sini)
+    # 5. Tombol submit dan logikanya
     if st.button("Submit Opportunity and All Solutions", type="primary"):
         # Kumpulkan data induk
         parent_payload = {
@@ -613,9 +604,6 @@ with tab2:
         else:
             df_master = pd.DataFrame(raw_all_leads_data)
 
-            # =============================================================
-            # ▼▼▼ BLOK FILTER BARU ▼▼▼
-            # =============================================================
             st.markdown("---")
             st.subheader("Filters")
             
@@ -656,7 +644,7 @@ with tab2:
             
             st.markdown("---")
             # =============================================================
-            # ▼▼▼ LOGIKA KANBAN (SEKARANG MENGGUNAKAN 'df_filtered') ▼▼▼
+            # ▼▼▼ LOGIKA KANBAN ▼▼▼
             # =============================================================
             
             # --- 1. LOGIKA NAVIGASI (DETAIL VIEW) --------------------
@@ -890,7 +878,7 @@ with tab4:
     if 'update_message' not in st.session_state:
         st.session_state.update_message = None
 
-    # BARU: Blok untuk menampilkan pesan dari session_state
+    # Blok untuk menampilkan pesan dari session_state
     if st.session_state.update_message:
         # Tampilkan pesan sukses jika ada
         st.success(st.session_state.update_message)
@@ -901,7 +889,7 @@ with tab4:
     
     if st.button("Get Opportunity Data"):
         st.session_state.lead_to_update = None
-        st.session_state.update_message = None # Hapus juga pesan lama saat cari baru
+        st.session_state.update_message = None
         if uid:
             with st.spinner(f"Retrieving opportunity data with uid: {uid}..."):
                 response = get_single_lead({"uid": uid})
@@ -933,7 +921,6 @@ with tab4:
 
         notes = st.text_area("Notes", value=lead.get("notes", ""), height=100, key="update_notes")
         try:
-            # Menggunakan float dulu untuk menangani jika ada angka desimal dari sheet (misal: 10000.0)
             initial_cost_value = int(float(lead.get("cost", 0)))
         except (ValueError, TypeError):
             initial_cost_value = 0
@@ -999,7 +986,6 @@ with tab5:
                 else: return data_list.index(value)
             except (ValueError, TypeError): return 0
         
-        # --- PERUBAHAN DIMULAI DI SINI ---
         
         # Ambil semua data master yang dibutuhkan
         all_sales_groups = get_sales_groups()
@@ -1128,13 +1114,10 @@ with tab6:
             else:
                 # Jika kolom OpportunityName tidak ada, tampilkan semua data tanpa filter
                 df_to_display = df_log
-            
-            # --- AKHIR DARI LOGIKA FILTER ---
 
             # Proses selanjutnya menggunakan df_to_display yang sudah difilter
             if not df_to_display.empty:
                 
-                # ▼▼▼ BLOK YANG DIMODIFIKASI UNTUK KONVERSI WAKTU ▼▼▼
                 # Urutkan dan format data waktu
                 if 'Timestamp' in df_to_display.columns:
                     # Konversi ke objek datetime yang mengenali timezone (UTC)
@@ -1145,7 +1128,6 @@ with tab6:
                     
                     # Konversi ke WIB (GMT+7) dan format ulang sebagai string yang mudah dibaca
                     df_to_display['Timestamp'] = df_to_display['Timestamp'].dt.tz_convert('Asia/Jakarta').dt.strftime('%Y-%m-%d %H:%M:%S')
-                # ▲▲▲ AKHIR DARI BLOK MODIFIKASI ▲▲▲
 
                 # Ubah tipe data untuk mencegah error tampilan
                 if 'OldValue' in df_to_display.columns:
