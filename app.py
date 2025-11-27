@@ -226,7 +226,7 @@ def clean_data_for_display(data):
     if not existing_columns_in_order:
         return pd.DataFrame()
         
-    df = df[existing_columns_in_order]
+    df = df[existing_columns_in_order].copy()
 
     # 1. Format Kolom Angka (Cost, Selling Price)
     for col in ['cost', 'selling_price']:
@@ -778,102 +778,164 @@ with tab2:
                             render_kanban_card(row)
 
 with tab3:
-    st.header("Search Opportunities")
-    keywords = [
-        "Inputter",
-        "Presales Account Manager",
-        "Sales Group",
-        "Opportunity Name",
-        "Pillar",
-        "Solution",
-        "Service",
-        "Brand",
-        "Channel",
-        "Company",
-        "Distributor"
-    ]
-    search_by_option = st.selectbox("Search By", keywords, key="search_option")
-
-    if search_by_option == "Inputter":
-        presales_keywords = [x.get("PresalesName", "Unknown") for x in get_master('getPresales')]
-        search_query = st.selectbox("Select Inputter", presales_keywords, key="search_query")
-    elif search_by_option == "Presales Account Manager":
-        responsible_keywords = [x.get("Responsible", "Unknown") for x in get_master('getResponsibles')]
-        search_query = st.selectbox("Select Presales Account Manager", responsible_keywords, key="search_query")
-    elif search_by_option == "Sales Group":
-        salesgroup_keywords = [x.get("SalesGroup", "Unknown") for x in get_master('getSalesGroups')]
-        search_query = st.selectbox("Select Sales Group", salesgroup_keywords, key="search_query")
-    elif search_by_option == "Opportunity Name":
-        opportunity_name_keywords = [x.get("Desc", "Unknown") for x in get_master('getOpportunities')]
-        search_query = st.selectbox("Select Opportunity Name", opportunity_name_keywords, key="search_query")
-    elif search_by_option == "Pillar":
-        pillar_keywords = get_pillars()
-        search_query = st.selectbox("Select Pillar", pillar_keywords, key="search_query")
-    elif search_by_option == "Solution":
-        pillar = st.selectbox("Select Pillar for Solution", get_pillars(), key="search_pillar")
-        solution_keywords = get_solutions(pillar)
-        search_query = st.selectbox("Select Solution", solution_keywords, key="search_query")
-    elif search_by_option == "Service":
-        pillar = st.selectbox("Select Pillar for Service", get_pillars(), key="search_pillar_service")
-        solution = st.selectbox("Select Solution for Service", get_solutions(pillar), key="search_solution")
-        service_keywords = get_services(solution)
-        search_query = st.selectbox("Select Service", service_keywords, key="search_query")
-    elif search_by_option == "Brand":
-        brand_keywords = [x.get("Brand", "Unknown") for x in get_master('getBrands')]
-        search_query = st.selectbox("Select Brand", brand_keywords, key="search_query")
-    elif search_by_option == "Channel":
-        channel_keywords = [x for x in pd.DataFrame(get_master('getBrands'))["Channel"].unique().tolist()]
-        search_query = st.selectbox("Select Channel", channel_keywords, key="search_query")
-    elif search_by_option == "Company":
-        company_keywords = [x.get("Company", "Unknown") for x in get_master('getCompanies')]
-        search_query = st.selectbox("Select Company", company_keywords, key="search_query")
-    elif search_by_option == "Distributor":
-        distributor_keywords = [x.get("Distributor", "Unknown") for x in get_master('getDistributors')]
-        search_query = st.selectbox("Select Distributor", distributor_keywords, key="search_query")
-
-    if st.button("Search Opportunity"):
-        if search_query:
-            search_params = {}
-            if search_by_option == "Inputter":
-                search_params["presales_name"] = search_query
-            elif search_by_option == "Presales Account Manager":
-                search_params["responsible_name"] = search_query
-            elif search_by_option == "Sales Group":
-                search_params["salesgroup_id"] = search_query
-            elif search_by_option == "Opportunity Name":
-                search_params["opportunity_name"] = search_query
-            elif search_by_option == "Pillar":
-                search_params["pillar"] = search_query
-            elif search_by_option == "Solution":
-                search_params["solution"] = search_query
-            elif search_by_option == "Service":
-                search_params["service"] = search_query
-            elif search_by_option == "Brand":
-                search_params["brand"] = search_query
-            elif search_by_option == "Channel":
-                search_params["channel"] = search_query
-            elif search_by_option == "Company":
-                search_params["company_name"] = search_query
-            elif search_by_option == "Distributor":
-                search_params["distributor_name"] = search_query
-            else:
-                st.error("Search option is not valid.")
-
-            with st.spinner(f"Searching opportunity by {search_by_option}: {search_query}..."):
-                response = get_single_lead(search_params)
-                if response and response.get("status") == 200:
-                    found_leads = response.get("data")
-                    if found_leads:
-                        st.success(f"Found {len(found_leads)} opportunity(s).")
-                        cleaned_df = clean_data_for_display(found_leads)
-                        st.dataframe(cleaned_df)
-                    else:
-                        st.info("No opportunity found with the given criteria.")
-                else:
-                    st.error(response.get("message", "Failed to search opportunity."))
-                    st.json(response)
+    st.header("Interactive Dashboard & Search")
+    
+    # 1. Ambil semua data (Cached)
+    with st.spinner("Loading dataset..."):
+        response = get_all_leads()
+    
+    if not response or response.get("status") != 200:
+        st.error("Gagal mengambil data dari server.")
+    else:
+        raw_data = response.get("data", [])
+        if not raw_data:
+            st.info("Belum ada data opportunity.")
         else:
-            st.warning("Please enter a search query.")
+            # Buat Master DataFrame
+            df = pd.DataFrame(raw_data)
+            
+            # Pre-processing Data (Penting agar filter berjalan lancar)
+            # 1. Konversi Angka
+            df['cost'] = pd.to_numeric(df['cost'], errors='coerce').fillna(0)
+            # 2. Konversi Tanggal (untuk filter date range)
+            df['start_date_dt'] = pd.to_datetime(df['start_date'], errors='coerce')
+            # 3. Isi nilai kosong dengan string agar tidak error di multiselect
+            fillna_cols = ['presales_name', 'responsible_name', 'channel', 'brand', 'stage', 'salesgroup_id', 'pillar', 'solution', 'company_name', 'vertical_industry', 'opportunity_name']
+            for col in fillna_cols:
+                if col in df.columns:
+                    df[col] = df[col].fillna("Unknown")
+
+            # =================================================================
+            # 🎛️ FILTER PANEL (SLICERS)
+            # =================================================================
+            with st.container(border=True):
+                st.subheader("🔍 Filter Panel (Slicers)")
+                
+                # Baris 1: Filter Personil & Group
+                c1, c2, c3, c4, c5 = st.columns(5)
+                with c1:
+                    # Ambil nilai unik dan urutkan
+                    opt_inputter = sorted(df['presales_name'].unique())
+                    sel_inputter = st.multiselect("Inputter", opt_inputter, placeholder="All Inputters")
+                with c2:
+                    opt_pam = sorted(df['responsible_name'].unique())
+                    sel_pam = st.multiselect("Presales Account Manager", opt_pam, placeholder="All PAMs")
+                with c3:
+                    opt_group = sorted(df['salesgroup_id'].unique())
+                    sel_group = st.multiselect("Sales Group", opt_group, placeholder="All Groups")
+                with c4:
+                    opt_channel = sorted(df['channel'].unique())
+                    sel_channel = st.multiselect("Channel", opt_channel, placeholder="All Channels")
+                with c5:
+                    opt_distributor = sorted(df['distributor_name'].unique())
+                    sel_distributor = st.multiselect("Distributor", opt_distributor, placeholder="All Distributors")
+
+                # Baris 2: Filter Produk & Client
+                c6, c7, c8, c9, c10 = st.columns(5)
+                with c6:
+                    opt_brand = sorted(df['brand'].unique())
+                    sel_brand = st.multiselect("Brand", opt_brand, placeholder="All Brands")
+                with c7:
+                    opt_pillar = sorted(df['pillar'].unique())
+                    sel_pillar = st.multiselect("Pillar", opt_pillar, placeholder="All Pillars")
+                with c8:
+                    opt_solution = sorted(df['solution'].unique())
+                    sel_solution = st.multiselect("Solution", opt_solution, placeholder="All Solutions")
+                with c9:
+                    opt_client = sorted(df['company_name'].unique())
+                    sel_client = st.multiselect("Company / Client", opt_client, placeholder="All Clients")
+                with c10:
+                    opt_vertical = sorted(df['vertical_industry'].unique())
+                    sel_vertical = st.multiselect("Vertical Industry", opt_vertical, placeholder="All Industries")
+
+                # Baris 3: Filter Stage & Date Range
+                c11, c12, c13 = st.columns([1, 2, 3])
+                with c11:
+                    opt_stage = sorted(df['stage'].unique())
+                    sel_stage = st.multiselect("Stage", opt_stage, placeholder="All Stages")
+                with c12:
+                    # Filter Tanggal (Start Date)
+                    min_date = df['start_date_dt'].min().date() if not df['start_date_dt'].isnull().all() else None
+                    max_date = df['start_date_dt'].max().date() if not df['start_date_dt'].isnull().all() else None
+                    
+                    date_range = st.date_input(
+                        "Start Date Range",
+                        value=(min_date, max_date) if min_date and max_date else None,
+                        help="Filter berdasarkan rentang tanggal Start Date"
+                    )
+                with c13:
+                    opt_opportunity = sorted(df['opportunity_name'].unique())
+                    sel_opportunity = st.multiselect("Opportunity Name", opt_opportunity, placeholder="All Opportunities")
+
+            # =================================================================
+            # 🔄 LOGIKA FILTERING (ENGINE)
+            # =================================================================
+            df_filtered = df.copy()
+
+            # Terapkan filter secara bertahap jika user memilih sesuatu
+            if sel_inputter:
+                df_filtered = df_filtered[df_filtered['presales_name'].isin(sel_inputter)]
+            if sel_pam:
+                df_filtered = df_filtered[df_filtered['responsible_name'].isin(sel_pam)]
+            if sel_group:
+                df_filtered = df_filtered[df_filtered['salesgroup_id'].isin(sel_group)]
+            if sel_channel:
+                df_filtered = df_filtered[df_filtered['channel'].isin(sel_channel)]
+            if sel_distributor:
+                df_filtered = df_filtered[df_filtered['distributor_name'].isin(sel_distributor)]
+            if sel_brand:
+                df_filtered = df_filtered[df_filtered['brand'].isin(sel_brand)]
+            if sel_pillar:
+                df_filtered = df_filtered[df_filtered['pillar'].isin(sel_pillar)]
+            if sel_solution:
+                df_filtered = df_filtered[df_filtered['solution'].isin(sel_solution)]
+            if sel_client:
+                df_filtered = df_filtered[df_filtered['company_name'].isin(sel_client)]
+            if sel_vertical:
+                df_filtered = df_filtered[df_filtered['vertical_industry'].isin(sel_vertical)]
+            if sel_stage:
+                df_filtered = df_filtered[df_filtered['stage'].isin(sel_stage)]
+            if sel_opportunity:
+                df_filtered = df_filtered[df_filtered['opportunity_name'].isin(sel_opportunity)]
+            
+            # Filter Tanggal (Hanya jika range lengkap start & end dipilih)
+            if isinstance(date_range, tuple) and len(date_range) == 2:
+                start_d, end_d = date_range
+                # Konversi kolom date di df_filtered ke date object untuk perbandingan
+                mask = (df_filtered['start_date_dt'].dt.date >= start_d) & (df_filtered['start_date_dt'].dt.date <= end_d)
+                df_filtered = df_filtered[mask]
+
+            # =================================================================
+            # 📊 KPI CARDS (Summary Metrics)
+            # =================================================================
+            st.markdown("### Summary")
+            
+            # Hitung metrik dari data yang SUDAH difilter
+            total_opps = len(df_filtered)
+            
+            # Hitung Opportunity Unik (karena 1 opp bisa banyak baris solusi)
+            total_unique_opps = df_filtered['opportunity_id'].nunique()
+
+            # Hitung Customer Unik (Distinct Count pada company_name)
+            total_unique_customers = df_filtered['company_name'].nunique()
+
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Total Solutions Line", f"{total_opps}")
+            m2.metric("Total Unique Opportunities", f"{total_unique_opps}")
+            m3.metric("Total Customers", f"{total_unique_customers}") 
+
+            st.markdown("---")
+
+            # =================================================================
+            # 📋 DATA TABLE
+            # =================================================================
+            st.subheader(f"Detailed Data ({total_opps} rows)")
+            
+            if not df_filtered.empty:
+                # Gunakan fungsi cleaning Anda untuk format tampilan akhir
+                st.dataframe(clean_data_for_display(df_filtered))
+            else:
+                st.warning("Tidak ada data yang cocok dengan kombinasi filter di atas.")
 
 with tab4:
     st.header("Update Opportunity")
