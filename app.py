@@ -219,7 +219,7 @@ def clean_data_for_display(data):
         df = pd.DataFrame(data)
 
     desired_order = [
-        'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'company_name', 'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'stage', 'notes', 'created_at', 'updated_at']
+        'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'company_name', 'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 'channel', 'distributor_name', 'cost', 'stage', 'notes', 'sales_notes', 'created_at', 'updated_at']
     
     existing_columns_in_order = [col for col in desired_order if col in df.columns]
     
@@ -622,7 +622,7 @@ with tab2:
                 )
             with f_col2:
                 selected_pams = st.multiselect(
-                    "Filter by Presales AM", 
+                    "Filter by Presales Account Manager", 
                     pam_options, 
                     key="kanban_filter_pam"
                 )
@@ -661,7 +661,7 @@ with tab2:
                 opportunity_details_df = df_filtered[df_filtered['opportunity_id'] == selected_id]
                 
                 if opportunity_details_df.empty:
-                    st.error(f"Could not find solution details for {selected_id} (mungkin tersembunyi oleh filter).")
+                    st.error(f"Could not find solution details for {selected_id} (maybe hidden by filter).")
                 else:
                     lead_data = opportunity_details_df.iloc[0].to_dict()
                     opp_name = lead_data.get('opportunity_name', 'N/A')
@@ -700,9 +700,9 @@ with tab2:
             else:
                 # Cek jika df_filtered kosong setelah filter diterapkan
                 if df_filtered.empty:
-                    st.warning("Tidak ada data yang cocok dengan filter Anda.")
+                    st.warning("No data available after applying filters.")
                 else:
-                    st.markdown("Menampilkan data unik per opportunity dengan **total biaya (cost)**. Klik 'View Details' pada kartu.")
+                    st.markdown("Displaying unique data per opportunity with **total cost**. Click 'View Details' on the card.")
 
                     # Pastikan kolom cost dan stage ada
                     if 'cost' not in df_filtered.columns:
@@ -785,11 +785,11 @@ with tab3:
         response = get_all_leads()
     
     if not response or response.get("status") != 200:
-        st.error("Gagal mengambil data dari server.")
+        st.error("Failed to load data.")
     else:
         raw_data = response.get("data", [])
         if not raw_data:
-            st.info("Belum ada data opportunity.")
+            st.info("No opportunity data available.")
         else:
             # Buat Master DataFrame
             df = pd.DataFrame(raw_data)
