@@ -12,6 +12,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+is_maintenance = st.secrets.get("general", {}).get("maintenance_mode", False)
+
+if is_maintenance:
+    st.title("🚧 Under Maintenance")
+    st.warning("Aplikasi sedang dalam perbaikan. Silakan kembali lagi nanti.")
+    st.stop() # Menghentikan eksekusi kode di bawahnya
+
 # Inisialisasi session state untuk mengingat apakah notifikasi sudah ditutup
 if 'update_dismissed_v1_5' not in st.session_state:
     st.session_state.update_dismissed_v1_5 = False
