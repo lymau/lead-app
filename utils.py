@@ -424,25 +424,34 @@ def tab1(default_inputter=None):
     target_email_list = [email_map.get(name) for name in selected_recipient_names]
     target_email_string = ", ".join(target_email_list)
 
+    # --- TOMBOL SUBMIT ---
     if st.button("Submit Opportunity and All Solutions", type="primary"):
-        # Validasi
+        
+        # 1. VALIDASI CHANNEL
         channel_error = False
         for idx, item in enumerate(st.session_state.product_lines):
             brand_channels = get_channels(item.get('brand'))
+            # Pastikan validasi hanya jalan jika list channel benar-benar ada isinya
             if brand_channels and not item.get('channel'):
                 st.error(f"⚠️ Solution #{idx+1}: Mohon pilih **Channel** untuk Brand **{item.get('brand')}**.")
                 channel_error = True
         
         if channel_error: st.stop()
-        if not opportunity_name or not company_name_final:
-            st.error("Opportunity Name and Company are required.")
+
+        # 2. VALIDASI FIELD WAJIB
+        if not opportunity_name:
+            st.error("❌ Opportunity Name wajib diisi.")
+            st.stop()
+        if not company_name_final:
+            st.error("❌ Nama Company wajib diisi/dipilih.")
             st.stop()
 
-        # Save Company if new
+        # 3. AUTO-SAVE COMPANY (Jika Baru)
         if is_company_listed == "No" and company_name_final:
-            db.add_master_company(company_name_final, vertical_industry_final)
+            with st.spinner("Saving new company to master data..."):
+                db.add_master_company(company_name_final, vertical_industry_final)
             
-        # Prepare Parent Data
+        # 4. SIAPKAN PARENT DATA
         parent_data = {
             "presales_name": selected_inputter_name, 
             "responsible_name": responsible_name_final,
@@ -452,20 +461,20 @@ def tab1(default_inputter=None):
             "start_date": start_date.strftime("%Y-%m-%d"),
             "company_name": company_name_final, 
             "vertical_industry": vertical_industry_final,
-            "stage": "Open",       
-            "stage_notes": ""
+            "stage": "Open"
         }
         
-        # Prepare Lines
+        # 5. SIAPKAN PRODUCT LINES
         final_product_lines = []
+        
         for line in st.session_state.product_lines:
             main_item = line.copy()
-            # Clean up temporary keys
-            for key in ['has_implementation', 'implementation_cost', 'implementation_service', 'implementation_notes_custom']:
+            ui_keys = ['has_implementation', 'implementation_cost', 'implementation_service', 'implementation_notes_custom']
+            for key in ui_keys:
                 main_item.pop(key, None)
+            
             final_product_lines.append(main_item)
             
-            # Add Implementation line if needed
             if line.get('has_implementation'):
                 base_note = f"Implementation for {line['solution']}"
                 custom_note = line.get('implementation_notes_custom', '').strip()
@@ -476,36 +485,72 @@ def tab1(default_inputter=None):
                     "solution": "Implementation Support",
                     "service": line.get('implementation_service', 'InHouse'),
                     "brand": line['brand'],
-                    "channel": line['channel'],
-                    "distributor_name": line['distributor_name'],
+                    "channel": line.get('channel'),
+                    "distributor_name": line.get('distributor_name'),
                     "cost": line.get('implementation_cost', 0),
                     "notes": final_note,
-                    "id": line['id'] + 9000 # Dummy ID to avoid conflict
+                    "id": line['id'] + 99999 
                 }
                 final_product_lines.append(impl_item)
         
-        with st.spinner("Submitting to Database..."):
+        # 6. EKSEKUSI KE BACKEND
+        with st.spinner("🚀 Submitting to Database..."):
             res = db.add_multi_line_opportunity(parent_data, final_product_lines)
             
             if res['status'] == 200:
-                # Email Logic
+                # --- EMAIL LOGIC ---
                 if target_email_list:
-                    sol_html = "<ul>" + "".join([f"<li><b>{l['solution']}</b> ({l['brand']})</li>" for l in final_product_lines]) + "</ul>"
-                    email_body = f"""
-                    <h3>New Opportunity Created</h3>
-                    <p><b>Customer:</b> {parent_data['company_name']}<br>
-                    <b>Sales:</b> {parent_data['sales_name']}</p>
-                    <p><b>Details:</b></p>{sol_html}
-                    """
-                    db.send_email_notification(target_email_string, f"[New Opp] {parent_data['opportunity_name']}", email_body)
+                    try:
+                        sol_html = "<ul>" + "".join([f"<li><b>{l['solution']}</b> ({l['brand']}) - Rp {format_number(l.get('cost',0))}</li>" for l in final_product_lines]) + "</ul>"
+                        email_body = f"""
+                        <h3>New Opportunity Created</h3>
+                        <p>
+                            <b>Customer:</b> {parent_data['company_name']}<br>
+                            <b>Sales:</b> {parent_data['sales_name']} ({parent_data['salesgroup_id']})<br>
+                            <b>Inputter:</b> {parent_data['presales_name']}
+                        </p>
+                        <hr>
+                        <p><b>Solution Details:</b></p>{sol_html}
+                        <p style="font-size: 10px; color: grey;">Generated by Presales App</p>
+                        """
+                        db.send_email_notification(target_email_string, f"[New Opp] {parent_data['opportunity_name']}", email_body)
+                        st.toast(f"📧 Email notification sent!", icon="✅")
+                    except Exception as e:
+                        st.toast(f"⚠️ Data saved but email failed: {e}", icon="⚠️")
                 
+                # --- SET SUCCESS MESSAGE ---
                 st.session_state.submission_message = res['message']
-                st.session_state.new_uids = [x['uid'] for x in res['data']]
+                st.session_state.new_uids = [x['uid'] for x in res.get('data', [])]
+                
+                # =========================================================
+                # 7. CLEAR FORM (RESET) - BAGIAN BARU
+                # =========================================================
+                
+                # A. Reset baris produk kembali ke 1 baris kosong
                 st.session_state.product_lines = [{"id": 0}]
-                time.sleep(1)
+                
+                # B. Hapus key widget Header agar kembali ke default (kosong/index 0)
+                keys_to_clear = [
+                    "parent_opportunity_name",      # Reset Opportunity Name
+                    "parent_company_select",        # Reset Company Dropdown
+                    "parent_company_text_input",    # Reset Company Text Input
+                    "parent_salesgroup_id",         # Reset Sales Group (balik ke index 0)
+                    "parent_sales_name",            # Reset Sales Name
+                    "parent_start_date",            # Reset Date
+                    "pam_flexible_choice",          # Reset PAM choice
+                    "parent_vertical_industry_select" # Reset Vertical
+                ]
+                
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        del st.session_state[key]
+
+                # C. Rerun untuk merender ulang halaman dengan state bersih
+                time.sleep(1.5) 
                 st.rerun()
+                
             else:
-                st.error(f"Failed to submit: {res['message']}")
+                st.error(f"❌ Failed to submit: {res['message']}")
 
     if st.session_state.submission_message:
         st.success(st.session_state.submission_message)
