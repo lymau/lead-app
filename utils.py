@@ -125,7 +125,7 @@ def clean_data_for_display(data):
     desired_order = [
         'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'company_name', 
         'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 
-        'channel', 'distributor_name', 'cost', 'stage', 'notes', 'sales_notes', 'created_at', 'updated_at'
+        'channel', 'distributor_name', 'cost', 'stage', 'notes', 'sales_notes', 'pillar_product', 'solution_product', 'created_at', 'updated_at'
     ]
     
     existing_cols = [col for col in desired_order if col in df.columns]
@@ -168,6 +168,34 @@ def clean_data_for_display(data):
 def tab1(default_inputter=None): 
     st.header("Add New Opportunity (Multi-Solution)")
     st.info("Fill out the main details once, then add one or more solutions below.")
+    
+    # --- MAPPING KHUSUS MAINTENANCE SERVICES (UPDATED) ---
+    MAINTENANCE_MAPPING = {
+        "Network": [
+            "SP Routing", "Optics", "WLAN and Campus LAN", "SD-WAN", 
+            "Automation, Assurance & Orchestration", "xPON", "Radio Microwave", 
+            "VSAT", "CGNAT", "DPI", "DDI", "Network Monitoring System", 
+            "Training", "Local Material", "Others (Non Sub-Pillar)"
+        ],
+        "Data Center & Cloud Infrastructure": [
+            "Compute", "Data Center Network Fabric", "Data Center and Application Assurance", 
+            "Software Defined Data Center", "Data Storage", "Data Protection", 
+            "Application Delivery", "Cloud Services", "Operating System", 
+            "Data Center Orchestration", "Data Center Observability", 
+            "Training", "Local Material", "Others (Non Sub-Pillar)"
+        ],
+        "Cyber Security": [
+            "DNS Security", "Next-Gen Firewall (NGFW)", "Endpoint Protection Platform (XDR, EDR)", 
+            "Secure Web Gateway", "E-Mail Security (E-Mail Gateway)", "SIEM", 
+            "Network Access Control", "Multi Factor Authentication", "Security Service Edge (SSE)", 
+            "Secure Access Service Edge (SASE)", "Web Application Firewall (WAF)", 
+            "Privileged Access Management (PAM)", "VA", "Threat Intelligence", 
+            "NDR", "SOAR", "WAAP (API Security, API Gateway)", "DLP", 
+            "Penetration Test", "ITDR", "Secure SD-WAN", "Secure Browser", 
+            "Fraud Detection System", "Operational Technology (OT) Security", 
+            "Training", "Local Material", "Others (Non Sub-Pillar)"
+        ]
+    }
     
     # Load Helper Data
     inputter_to_pam_map = get_pam_mapping_dict()
@@ -280,6 +308,30 @@ def tab1(default_inputter=None):
             with lc1:
                 # 1. Pillar
                 line['pillar'] = st.selectbox("Pillar", get_pillars(), key=f"pillar_{line['id']}")
+                # === KHUSUS MAINTENANCE SERVICES ===
+                if line['pillar'] == "Maintenance Services":
+                    st.info("🔧 Maintenance Details")
+                    
+                    # Pop-up Field 1: Pillar Product
+                    pp_opts = list(MAINTENANCE_MAPPING.keys())
+                    line['pillar_product'] = st.selectbox(
+                        "Pillar Product*", 
+                        pp_opts, 
+                        key=f"pp_{line['id']}"
+                    )
+                    
+                    # Pop-up Field 2: Solution Product (Cascading)
+                    sp_opts = MAINTENANCE_MAPPING.get(line['pillar_product'], [])
+                    line['solution_product'] = st.selectbox(
+                        "Solution Product*", 
+                        sp_opts, 
+                        key=f"sp_{line['id']}"
+                    )
+                else:
+                    # Reset nilai jika bukan maintenance agar database bersih
+                    line['pillar_product'] = None
+                    line['solution_product'] = None
+                # ================================================
                 # 2. Solution
                 sol_opts = get_solutions(line['pillar'])
                 line['solution'] = st.selectbox("Solution", sol_opts, key=f"solution_{line['id']}")
@@ -489,7 +541,8 @@ def tab1(default_inputter=None):
                     "distributor_name": line.get('distributor_name'),
                     "cost": line.get('implementation_cost', 0),
                     "notes": final_note,
-                    "id": line['id'] + 99999 
+                    "id": line['id'] + 99999,
+                    "pillar_product": None, "solution_product": None
                 }
                 final_product_lines.append(impl_item)
         

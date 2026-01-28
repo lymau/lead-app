@@ -371,22 +371,27 @@ def add_multi_line_opportunity(parent_data, product_lines):
                     INSERT INTO opportunities (
                         uid, opportunity_id, product_id, presales_name, salesgroup_id, sales_name, 
                         responsible_name, opportunity_name, start_date, company_name, 
-                        vertical_industry, pillar, solution, service, brand, channel, 
-                        distributor_name, cost, notes, stage, created_at, updated_at
+                        vertical_industry, pillar, solution, service, 
+                        pillar_product, solution_product, 
+                        brand, channel, distributor_name, cost, notes, stage, created_at, updated_at
                     ) VALUES (
                         :uid, :oid, :pid, :pname, :sgid, :sname, 
                         :pam, :oname, :sdate, :cname, 
-                        :vi, :plr, :sol, :svc, :br, :ch, 
-                        :dist, :cost, :note, :stage_val, :now, :now
+                        :vi, :plr, :sol, :svc, 
+                        :pp, :sp, 
+                        :br, :ch, :dist, :cost, :note, :stage_val, :now, :now
                     )
                 """)
+                
                 conn.execute(ins_opp, {
                     "uid": uid, "oid": new_opp_id, "pid": product_id_code,
                     "pname": parent_data['presales_name'], "sgid": parent_data['salesgroup_id'], 
                     "sname": parent_data['sales_name'], "pam": parent_data['responsible_name'], 
                     "oname": parent_data['opportunity_name'], "sdate": parent_data['start_date'],
                     "cname": parent_data['company_name'], "vi": parent_data['vertical_industry'],
-                    "plr": line['pillar'], "sol": line['solution'], "svc": line['service'], 
+                    "plr": line['pillar'], "sol": line['solution'], "svc": line['service'],
+                    "pp": line.get('pillar_product', None),
+                    "sp": line.get('solution_product', None),
                     "br": line.get('brand'), "ch": line.get('channel'), "dist": line.get('distributor_name'), 
                     "cost": line.get('cost', 0), "note": line.get('notes', ''), 
                     "stage_val": parent_data.get('stage', 'Open'),
