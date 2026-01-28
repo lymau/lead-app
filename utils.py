@@ -742,7 +742,11 @@ def tab3():
                 
                 with c13:
                     # Search Text Manual (Opsional, pelengkap dropdown)
-                    search_txt = st.text_input("Search Text (Opportunity Name)", placeholder="Type to search...")
+                    sel_opportunity = st.multiselect(
+                        "Opportunity Name", 
+                        get_opts('opportunity_name'), 
+                        placeholder="Select Opportunity Name..."
+                    )
 
             # =================================================================
             # 🔄 LOGIKA FILTERING (ENGINE)
@@ -763,11 +767,9 @@ def tab3():
             if sel_stage: df_filtered = df_filtered[df_filtered['stage'].isin(sel_stage)]
             
             # Filter Text Search Manual
-            if search_txt:
-                mask = df_filtered['opportunity_name'].str.contains(search_txt, case=False, na=False)
-                df_filtered = df_filtered[mask]
+            if sel_opportunity:
+                df_filtered = df_filtered[df_filtered['opportunity_name'].isin(sel_opportunity)]
             
-            # Filter Tanggal
             if isinstance(date_range, tuple) and len(date_range) == 2 and 'start_date_dt' in df.columns:
                 start_d, end_d = date_range
                 mask = (df_filtered['start_date_dt'].dt.date >= start_d) & (df_filtered['start_date_dt'].dt.date <= end_d)
