@@ -1011,8 +1011,26 @@ def tab4():
 def tab5():
     st.header("Edit Opportunity (Full)")
     st.warning("⚠️ Perhatian: Mengubah Sales Group akan men-generate UID baru.")
-    
-    # --- 1. SEARCH SECTION ---
+
+    # --- HELPER: RESET STATE ---
+    def reset_edit_state():
+        st.session_state.lead_to_edit = None
+        st.session_state.edit_submission_message = None
+        st.session_state.edit_new_uid = None
+
+    # --- HELPER: SAFE INDEX FINDER ---
+    def get_index(data_list, value, key=None):
+        try:
+            if not data_list or value is None: return None
+            if key: 
+                vals = [str(item.get(key, "")).strip() for item in data_list]
+                value = str(value).strip()
+                return vals.index(value)
+            return data_list.index(value)
+        except (ValueError, TypeError, IndexError): 
+            return None
+
+    # 1. Inisialisasi State
     if 'lead_to_edit' not in st.session_state:
         st.session_state.lead_to_edit = None
     if 'edit_submission_message' not in st.session_state:
@@ -1020,49 +1038,93 @@ def tab5():
     if 'edit_new_uid' not in st.session_state:
         st.session_state.edit_new_uid = None
 
-    uid_to_find = st.text_input("Enter UID to Edit", key="uid_finder_edit")
-    
-    if st.button("Find Data"):
-        st.session_state.lead_to_edit = None
-        st.session_state.edit_submission_message = None
-        st.session_state.edit_new_uid = None
-        
-        if uid_to_find:
-            with st.spinner("Searching..."):
-                # Menggunakan db.get_single_lead sesuai import backend as db
-                res = db.get_single_lead({"uid": uid_to_find})
-                if res.get("status") == 200:
-                    st.session_state.lead_to_edit = res.get("data")[0]
-                    st.success("Data found. Please edit the form below.")
-                else:
-                    st.error("UID Not Found")
-        else:
-            st.warning("Please enter a UID.")
+    current_user_name = st.session_state.get('presales_session', {}).get('username', 'Unknown')
 
-    # Tampilkan Pesan Sukses Update (Jika ada)
+    # --- SECTION A: SELECTOR (ADAPTED FROM TAB 4) ---
+    st.info("Select an Opportunity and a Product Line to edit full details.")
+
+    # Load Data
+    with st.spinner("Loading your opportunities..."):
+        raw_data = db.get_leads_by_group_logic(current_user_name)
+
+    if raw_data and raw_data.get('status') == 200 and raw_data.get('data'):
+        df = pd.DataFrame(raw_data['data'])
+        
+        # 1. Dropdown Opportunity
+        opp_list = sorted(df['opportunity_name'].unique().tolist())
+        sel_opp_name = st.selectbox(
+            "1. Select Opportunity Name", 
+            opp_list, 
+            key="tab5_sel_opp_name", 
+            placeholder="Choose opportunity...", 
+            index=None,
+            on_change=reset_edit_state
+        )
+
+        # 2. Dropdown Product (Cascading)
+        if sel_opp_name:
+            subset = df[df['opportunity_name'] == sel_opp_name]
+            
+            # Mapping Label -> UID
+            item_map = {}
+            for idx, row in subset.iterrows():
+                pillar = row.get('pillar') or "NoPillar"
+                brand = row.get('brand') or "NoBrand"
+                sol = row.get('solution') or "NoSol"
+                svc = row.get('service') or "-"
+                label = f"{pillar} - {sol} ({svc}) - {brand}"
+                item_map[label] = row['uid']
+            
+            sel_product_label = st.selectbox(
+                "2. Select Product/Solution Line", 
+                list(item_map.keys()), 
+                key="tab5_sel_prod_label",
+                on_change=reset_edit_state
+            )
+
+            # Tombol Load Data
+            if st.button("Edit This Item (Full Mode)", type="primary"):
+                target_uid = item_map[sel_product_label]
+                
+                # Ambil data fresh detail
+                res = db.get_single_lead({"uid": target_uid}) # Gunakan get_single_lead agar konsisten dgn Tab 5 lama
+                if res.get("status") == 200 and res.get("data"):
+                    st.session_state.lead_to_edit = res['data'][0]
+                    st.session_state.edit_submission_message = None
+                    st.session_state.edit_new_uid = None
+                else:
+                    st.error("Error fetching detailed data.")
+        else:
+            if st.session_state.lead_to_edit:
+                reset_edit_state()
+                st.rerun()
+    else:
+        st.warning("No opportunities found for your group.")
+        st.stop() # Stop jika tidak ada data
+
+    # --- SECTION B: NOTIFICATION AREA ---
     if st.session_state.edit_submission_message:
         st.success(st.session_state.edit_submission_message)
         if st.session_state.edit_new_uid:
-            st.info(f"IMPORTANT: The UID has been updated. The new UID is: {st.session_state.edit_new_uid}")
-        # Reset pesan
-        st.session_state.edit_submission_message = None
-        st.session_state.edit_new_uid = None
+            st.info(f"📢 **IMPORTANT:** UID Updated! New UID: `{st.session_state.edit_new_uid}`")
+        
+        if st.button("Close Message"):
+            st.session_state.edit_submission_message = None
+            st.rerun()
 
-    # --- 2. FORM EDIT SECTION ---
+    # --- SECTION C: FULL EDIT FORM ---
     if st.session_state.lead_to_edit:
         lead = st.session_state.lead_to_edit
-        st.markdown("---")
-        st.subheader(f"Step 2: Edit Data for '{lead.get('opportunity_name', '')}'")
         
-        # Helper function local
-        def get_index(data_list, value, key=None):
-            try:
-                if key: 
-                    vals = [item.get(key) for item in data_list]
-                    return vals.index(value)
-                return data_list.index(value)
-            except (ValueError, TypeError, IndexError): 
-                return 0
+        st.markdown("---")
+        st.subheader(f"Editing: {lead.get('opportunity_name', 'Unknown')}")
+        st.caption(f"Current UID: `{lead.get('uid')}`")
+
+        # Double Check Consistency
+        if sel_opp_name and lead['opportunity_name'] != sel_opp_name:
+             st.warning("⚠️ Data mismatch. Please select the item again.")
+             st.session_state.lead_to_edit = None
+             st.stop()
 
         # Load Master Data
         all_sales_groups = get_sales_groups()
@@ -1072,117 +1134,80 @@ def tab5():
         all_companies_data = get_master('getCompanies')
         all_distributors = get_master('getDistributors')
 
-        # Layout Kolom
+        # --- FORM LAYOUT ---
         c1, c2 = st.columns(2)
         
         with c1:
-            # 1. Sales Group & Name
-            edited_sales_group = st.selectbox(
-                "Sales Group", 
-                all_sales_groups, 
-                index=get_index(all_sales_groups, lead.get('salesgroup_id')), 
-                key="edit_sales_group"
-            )
+            st.markdown("##### Sales & Internal Info")
             
+            # Sales Group
+            edited_sales_group = st.selectbox("Sales Group", all_sales_groups, 
+                index=get_index(all_sales_groups, lead.get('salesgroup_id')), key="edit_sg")
+            
+            # Sales Name
             sales_opts = get_sales_name_by_sales_group(edited_sales_group)
-            edited_sales_name = st.selectbox(
-                "Sales Name", 
-                sales_opts, 
-                index=get_index(sales_opts, lead.get('sales_name')), 
-                key="edit_sales_name"
-            )
+            edited_sales_name = st.selectbox("Sales Name", sales_opts, 
+                index=get_index(sales_opts, lead.get('sales_name')), key="edit_sn")
             
-            # 2. PAM
-            edited_responsible = st.selectbox(
-                "Presales Account Manager", 
-                all_responsibles, 
+            # PAM
+            edited_responsible = st.selectbox("Presales Account Manager", all_responsibles, 
                 index=get_index(all_responsibles, lead.get('responsible_name'), 'Responsible'), 
-                format_func=lambda x: x.get("Responsible", ""), 
-                key="edit_responsible"
-            )
+                format_func=lambda x: x.get("Responsible", "") if isinstance(x, dict) else str(x), key="edit_pam")
 
-            # 3. Pillar & Solution
-            edited_pillar = st.selectbox(
-                "Pillar", 
-                all_pillars, 
-                index=get_index(all_pillars, lead.get('pillar')), 
-                key="edit_pillar"
-            )
+            st.markdown("##### Product Solution")
             
+            # Pillar
+            edited_pillar = st.selectbox("Pillar", all_pillars, 
+                index=get_index(all_pillars, lead.get('pillar')), key="edit_pillar")
+            
+            # Solution
             solution_options = get_solutions(edited_pillar)
-            edited_solution = st.selectbox(
-                "Solution", 
-                solution_options, 
-                index=get_index(solution_options, lead.get('solution')), 
-                key="edit_solution"
-            )
+            edited_solution = st.selectbox("Solution", solution_options, 
+                index=get_index(solution_options, lead.get('solution')), key="edit_sol")
 
         with c2:
-            # 4. Company & Vertical
-            edited_company = st.selectbox(
-                "Company", 
-                all_companies_data, 
+            st.markdown("##### Customer Info")
+            
+            # Company
+            edited_company = st.selectbox("Company", all_companies_data, 
                 index=get_index(all_companies_data, lead.get('company_name'), 'Company'), 
-                format_func=lambda x: x.get("Company", ""), 
-                key="edit_company"
-            )
+                format_func=lambda x: x.get("Company", "") if isinstance(x, dict) else str(x), key="edit_comp")
             
-            # Logic Vertical Industry (Otomatis dari Company yang dipilih)
-            derived_vertical_industry = ""
-            if edited_company:
-                derived_vertical_industry = edited_company.get('Vertical Industry', '')
-            
-            st.text_input("Vertical Industry", value=derived_vertical_industry, key="edit_vertical", disabled=True)
+            # Vertical (Auto)
+            derived_vertical = edited_company.get('Vertical Industry', '') if isinstance(edited_company, dict) else lead.get('vertical_industry', '')
+            st.text_input("Vertical Industry (Auto)", value=derived_vertical, disabled=True, key="edit_vert")
 
-            # 5. Service & Brand
+            st.markdown("##### Detail & Specs")
+            
+            # Service
             service_options = get_services(edited_solution)
-            edited_service = st.selectbox(
-                "Service", 
-                service_options, 
-                index=get_index(service_options, lead.get('service')), 
-                key="edit_service"
-            )
+            edited_service = st.selectbox("Service", service_options, 
+                index=get_index(service_options, lead.get('service')), key="edit_svc")
             
-            edited_brand = st.selectbox(
-                "Brand", 
-                all_brands, 
+            # Brand
+            edited_brand = st.selectbox("Brand", all_brands, 
                 index=get_index(all_brands, lead.get('brand'), 'Brand'), 
-                format_func=lambda x: x.get("Brand", ""), 
-                key="edit_brand"
-            )
+                format_func=lambda x: x.get("Brand", "") if isinstance(x, dict) else str(x), key="edit_brand")
 
-            # 6. Distributor Logic
+            # Distributor
             current_dist = lead.get('distributor_name', 'Not via distributor')
-            is_via_default = 0 if current_dist != "Not via distributor" else 1
+            is_via_default = 0 if current_dist != "Not via distributor" and current_dist else 1
             
-            is_via_distributor_choice = st.radio(
-                "Via Distributor?", 
-                ("Yes", "No"), 
-                index=is_via_default, 
-                key="edit_is_via_distributor", 
-                horizontal=True
-            )
+            is_via = st.radio("Via Distributor?", ("Yes", "No"), index=is_via_default, horizontal=True, key="edit_via")
             
-            if is_via_distributor_choice == "Yes":
-                edited_distributor = st.selectbox(
-                    "Distributor", 
-                    all_distributors, 
+            final_dist = "Not via distributor"
+            if is_via == "Yes":
+                edited_dist = st.selectbox("Select Distributor", all_distributors, 
                     index=get_index(all_distributors, current_dist, 'Distributor'), 
-                    format_func=lambda x: x.get("Distributor", ""), 
-                    key="edit_distributor_select"
-                )
-                final_distributor = edited_distributor.get('Distributor') if isinstance(edited_distributor, dict) else edited_distributor
-            else:
-                final_distributor = "Not via distributor"
+                    format_func=lambda x: x.get("Distributor", "") if isinstance(x, dict) else str(x), key="edit_dist_name")
+                final_dist = edited_dist.get('Distributor') if isinstance(edited_dist, dict) else edited_dist
 
-        # --- SAVE BUTTON ---
+        # --- SAVE ACTION ---
         st.markdown("---")
-        if st.button("Save Full Changes", type="primary"):
-            # Construct Payload
-            # Gunakan lead.copy() agar field yang tidak ada di form (misal: channel) tidak hilang/menjadi None
+        if st.button("💾 Save Full Changes", type="primary", use_container_width=True):
             payload = lead.copy()
             
-            # Update dengan data baru dari form
+            # Update Payload
             payload.update({
                 "salesgroup_id": edited_sales_group,
                 "sales_name": edited_sales_name,
@@ -1192,27 +1217,27 @@ def tab5():
                 "service": edited_service,
                 "brand": edited_brand.get('Brand') if isinstance(edited_brand, dict) else edited_brand,
                 "company_name": edited_company.get('Company') if isinstance(edited_company, dict) else edited_company,
-                "vertical_industry": derived_vertical_industry,
-                "distributor_name": final_distributor,
-                "user": lead.get('presales_name') # User untuk audit log
+                "vertical_industry": derived_vertical,
+                "distributor_name": final_dist,
+                "user": current_user_name
             })
             
-            with st.spinner("Updating opportunity..."):
-                # Panggil Backend
+            with st.spinner("Saving changes..."):
                 res = db.update_full_opportunity(payload)
                 
                 if res['status'] == 200:
                     st.session_state.edit_submission_message = res.get("message")
                     
-                    # Cek Ganti UID
-                    new_uid = res.get("data", {}).get("uid")
-                    if new_uid and new_uid != uid_to_find:
-                        st.session_state.edit_new_uid = new_uid
+                    # Cek UID Change
+                    new_uid_db = res.get("data", {}).get("uid")
+                    if new_uid_db and new_uid_db != lead.get('uid'):
+                        st.session_state.edit_new_uid = new_uid_db
                     
-                    st.session_state.lead_to_edit = None # Tutup Form
+                    st.session_state.lead_to_edit = None 
+                    time.sleep(1) # Beri jeda sedikit agar UX lebih smooth
                     st.rerun()
                 else:
-                    st.error(res['message'])
+                    st.error(f"Failed: {res['message']}")
 
 @st.fragment
 def tab6():
