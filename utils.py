@@ -202,8 +202,12 @@ def tab1(default_inputter=None):
     DEFAULT_PAM = "Not Assigned"
 
     # --- AMBIL USER DARI SESSION ---
+    current_user_name = ""
+    current_access_group = ""
+    
     if 'presales_session' in st.session_state:
         current_user_name = st.session_state.presales_session['username']
+        current_access_group = st.session_state.presales_session.get('access_group', '')
     else:
         st.error("Session missing. Please login.")
         return
@@ -232,7 +236,24 @@ def tab1(default_inputter=None):
             st.text_input("Presales Account Manager", value=responsible_name_final, disabled=True)
 
         # 3. Sales Group
-        salesgroup_id = st.selectbox("Choose Sales Group", get_sales_groups(), key="parent_salesgroup_id")
+        # -----------------------------------------------------------
+        # Ambil semua opsi sales group dari database/master
+        all_sg_options = get_sales_groups()
+        
+        # LOGIKA FILTER: Jika user dari grup 'ENT_1', batasi pilihan
+        if current_access_group == 'ENT_1':
+            # Hanya ambil jika namanya 'ENT1' atau 'SP1B'
+            final_sg_options = [sg for sg in all_sg_options if sg in ['ENT1', 'SP1B']]
+            
+            # Fallback: Jika list kosong (misal typo di master), kembalikan ke default biar tidak error
+            if not final_sg_options: 
+                final_sg_options = all_sg_options
+        else:
+            # User lain (bukan ENT_1) melihat semua pilihan
+            final_sg_options = all_sg_options
+            
+        salesgroup_id = st.selectbox("Choose Sales Group", final_sg_options, key="parent_salesgroup_id")
+        # -----------------------------------------------------------
         
         # 4. Sales Name
         sales_name_options = get_sales_name_by_sales_group(salesgroup_id)
