@@ -166,10 +166,28 @@ def clean_data_for_display(data):
 
 @st.fragment
 def tab1(default_inputter=None): 
+    # --- CSS INJECTION: UBAH TOMBOL PRIMARY JADI HIJAU ---
+    st.markdown("""
+        <style>
+        div[data-testid="stButton"] > button[kind="primary"] {
+            background-color: #28a745 !important;
+            border-color: #28a745 !important;
+            color: white !important; 
+        }
+        div[data-testid="stButton"] > button[kind="primary"]:hover {
+            background-color: #218838 !important;
+            border-color: #1e7e34 !important;
+        }
+        div[data-testid="stButton"] > button[kind="primary"]:focus {
+            box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.5) !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     st.header("Add New Opportunity (Multi-Solution)")
     st.info("Fill out the main details once, then add one or more solutions below.")
     
-    # --- MAPPING KHUSUS MAINTENANCE SERVICES (UPDATED) ---
+    # --- MAPPING KHUSUS MAINTENANCE SERVICES ---
     MAINTENANCE_MAPPING = {
         "Network": [
             "SP Routing", "Optics", "WLAN and Campus LAN", "SD-WAN", 
@@ -237,19 +255,24 @@ def tab1(default_inputter=None):
 
         # 3. Sales Group
         # -----------------------------------------------------------
-        # Ambil semua opsi sales group dari database/master
         all_sg_options = get_sales_groups()
         
-        # LOGIKA FILTER: Jika user dari grup 'ENT_1', batasi pilihan
+        # LOGIKA FILTER BERTINGKAT
         if current_access_group == 'ENT_1':
-            # Hanya ambil jika namanya 'ENT1' atau 'SP1B'
+            # Rule 1: ENT_1 hanya boleh lihat ENT1 dan SP1B
             final_sg_options = [sg for sg in all_sg_options if sg in ['ENT1', 'SP1B']]
+            if not final_sg_options: final_sg_options = all_sg_options
+
+        elif current_access_group == '2ND_TIER':
+            # Rule 2: 2ND_TIER dipaksa LOCK ke SP2B
+            final_sg_options = ['SP2B']
+
+        elif current_access_group == 'ENT_2':
+            # Rule 3: ENT_2 dipaksa LOCK ke ENT2 [NEW RULE]
+            final_sg_options = ['ENT2']
             
-            # Fallback: Jika list kosong (misal typo di master), kembalikan ke default biar tidak error
-            if not final_sg_options: 
-                final_sg_options = all_sg_options
         else:
-            # User lain (bukan ENT_1) melihat semua pilihan
+            # Rule Default: User lain (Admin/General) lihat semua
             final_sg_options = all_sg_options
             
         salesgroup_id = st.selectbox("Choose Sales Group", final_sg_options, key="parent_salesgroup_id")
@@ -332,27 +355,14 @@ def tab1(default_inputter=None):
                 # === KHUSUS MAINTENANCE SERVICES ===
                 if line['pillar'] == "Maintenance Services":
                     st.info("🔧 Maintenance Details")
-                    
-                    # Pop-up Field 1: Pillar Product
                     pp_opts = list(MAINTENANCE_MAPPING.keys())
-                    line['pillar_product'] = st.selectbox(
-                        "Pillar Product*", 
-                        pp_opts, 
-                        key=f"pp_{line['id']}"
-                    )
-                    
-                    # Pop-up Field 2: Solution Product (Cascading)
+                    line['pillar_product'] = st.selectbox("Pillar Product*", pp_opts, key=f"pp_{line['id']}")
                     sp_opts = MAINTENANCE_MAPPING.get(line['pillar_product'], [])
-                    line['solution_product'] = st.selectbox(
-                        "Solution Product*", 
-                        sp_opts, 
-                        key=f"sp_{line['id']}"
-                    )
+                    line['solution_product'] = st.selectbox("Solution Product*", sp_opts, key=f"sp_{line['id']}")
                 else:
-                    # Reset nilai jika bukan maintenance agar database bersih
                     line['pillar_product'] = None
                     line['solution_product'] = None
-                # ================================================
+                
                 # 2. Solution
                 sol_opts = get_solutions(line['pillar'])
                 line['solution'] = st.selectbox("Solution", sol_opts, key=f"solution_{line['id']}")
@@ -364,35 +374,17 @@ def tab1(default_inputter=None):
                 # 4. Brand & Channel
                 line['brand'] = st.selectbox("Brand", unique_brands_list, key=f"brand_{line['id']}")
                 avail_channels = get_channels(line.get('brand'))
-
                 default_idx = 0 if len(avail_channels) == 1 else None
-
-                line['channel'] = st.selectbox(
-                    "Channel*", 
-                    avail_channels, 
-                    index=default_idx,
-                    placeholder="Select Channel...",
-                    key=f"channel_{line['id']}",
-                    help="Otomatis terpilih jika hanya ada satu opsi channel."
-                )
+                line['channel'] = st.selectbox("Channel*", avail_channels, index=default_idx, placeholder="Select Channel...", key=f"channel_{line['id']}")
                 
                 # 5. Currency & Cost
                 st.markdown("---")
                 col_curr, col_val = st.columns([0.35, 0.65])
-                
                 with col_curr:
                     currency = st.selectbox("Currency", ["IDR", "USD"], key=f"curr_{line['id']}")
-                
                 current_rate = get_usd_to_idr_rate()
-                
                 with col_val:
-                    input_val = st.number_input(
-                        f"Cost Input ({currency})", 
-                        min_value=0.0, 
-                        step=100.0 if currency == "USD" else 1000000.0, 
-                        format="%f",
-                        key=f"input_val_{line['id']}"
-                    )
+                    input_val = st.number_input(f"Cost Input ({currency})", min_value=0.0, step=100.0 if currency == "USD" else 1000000.0, format="%f", key=f"input_val_{line['id']}")
 
                 final_cost_idr = 0
                 calc_info = ""
@@ -407,8 +399,7 @@ def tab1(default_inputter=None):
                         calc_info = f"ℹ️ **Conversion:** ${input_val:,.0f} x (Rate Rp {current_rate:,.0f})"
                 else:
                     final_cost_idr = input_val
-                    calc_info = ""
-
+                
                 line['cost'] = final_cost_idr
 
                 if currency == "USD":
@@ -430,42 +421,24 @@ def tab1(default_inputter=None):
             if not is_excluded and "Implementation Support" not in line.get('solution', '') and final_cost_idr > 0:
                 st.markdown("---")
                 add_impl = st.checkbox("➕ Add 'Implementation Support' for this item?", key=f"chk_impl_{line['id']}")
-                
                 line['has_implementation'] = add_impl
                 
                 if add_impl:
                     with st.container(border=True):
                         st.markdown("###### 🔧 Implementation Details")
                         k1, k2, k3 = st.columns([0.3, 0.3, 0.4])
-                        
                         with k1:
                             st.caption(f"🔗 Linked to: **{line['brand']}**")
                             impl_svc_opts = get_services("Implementation Support")
                             if not impl_svc_opts: impl_svc_opts = ["InHouse", "Distributor/Partner", "Subcont"]
-                            
-                            line['implementation_service'] = st.selectbox(
-                                "Service Type*", 
-                                impl_svc_opts, 
-                                key=f"impl_svc_{line['id']}"
-                            )
-                            
+                            line['implementation_service'] = st.selectbox("Service Type*", impl_svc_opts, key=f"impl_svc_{line['id']}")
                         with k2:
-                            impl_cost_input = st.number_input(
-                                "Jasa Cost (IDR)*", 
-                                min_value=0.0, 
-                                step=1000000.0, 
-                                key=f"impl_cost_{line['id']}"
-                            )
+                            impl_cost_input = st.number_input("Jasa Cost (IDR)*", min_value=0.0, step=1000000.0, key=f"impl_cost_{line['id']}")
                             line['implementation_cost'] = impl_cost_input
-                        
                         with k3:
-                            impl_notes = st.text_input(
-                                "Scope/Notes (Optional)", 
-                                placeholder="e.g., Exclude Cabling, 5 Mandays...",
-                                key=f"impl_note_{line['id']}"
-                            )
+                            impl_notes = st.text_input("Scope/Notes (Optional)", placeholder="e.g., Exclude Cabling...", key=f"impl_note_{line['id']}")
                             line['implementation_notes_custom'] = impl_notes
-
+                        
                         total_bundle = final_cost_idr + impl_cost_input
                         st.markdown(f"**💰 Total Solution Cost:** :green[Rp {format_number(total_bundle)}]")
             else:
@@ -482,36 +455,26 @@ def tab1(default_inputter=None):
     st.markdown("---")
     st.subheader("Step 3: Submit Opportunity")
 
-    # Email Notification
     presales_data = get_master('getPresales') 
     email_map = {p['PresalesName']: p['Email'] for p in presales_data if p.get('Email')}
     recipient_options = sorted(list(email_map.keys()))
     default_recipients = [current_user_name] if current_user_name in recipient_options else []
 
     selected_recipient_names = st.multiselect(
-        "📧 Send Email Notification To:", 
-        options=recipient_options,
-        default=default_recipients,
-        placeholder="Choose recipients..."
+        "📧 Send Email Notification To:", options=recipient_options, default=default_recipients, placeholder="Choose recipients..."
     )
     target_email_list = [email_map.get(name) for name in selected_recipient_names]
     target_email_string = ", ".join(target_email_list)
 
-    # --- TOMBOL SUBMIT ---
     if st.button("Submit Opportunity and All Solutions", type="primary"):
-        
-        # 1. VALIDASI CHANNEL
         channel_error = False
         for idx, item in enumerate(st.session_state.product_lines):
             brand_channels = get_channels(item.get('brand'))
-            # Pastikan validasi hanya jalan jika list channel benar-benar ada isinya
             if brand_channels and not item.get('channel'):
                 st.error(f"⚠️ Solution #{idx+1}: Mohon pilih **Channel** untuk Brand **{item.get('brand')}**.")
                 channel_error = True
-        
         if channel_error: st.stop()
 
-        # 2. VALIDASI FIELD WAJIB
         if not opportunity_name:
             st.error("❌ Opportunity Name wajib diisi.")
             st.stop()
@@ -519,117 +482,61 @@ def tab1(default_inputter=None):
             st.error("❌ Nama Company wajib diisi/dipilih.")
             st.stop()
 
-        # 3. AUTO-SAVE COMPANY (Jika Baru)
         if is_company_listed == "No" and company_name_final:
             with st.spinner("Saving new company to master data..."):
                 db.add_master_company(company_name_final, vertical_industry_final)
             
-        # 4. SIAPKAN PARENT DATA
         parent_data = {
-            "presales_name": selected_inputter_name, 
-            "responsible_name": responsible_name_final,
-            "salesgroup_id": salesgroup_id, 
-            "sales_name": sales_name,
-            "opportunity_name": opportunity_name, 
-            "start_date": start_date.strftime("%Y-%m-%d"),
-            "company_name": company_name_final, 
-            "vertical_industry": vertical_industry_final,
-            "stage": "Open"
+            "presales_name": selected_inputter_name, "responsible_name": responsible_name_final,
+            "salesgroup_id": salesgroup_id, "sales_name": sales_name,
+            "opportunity_name": opportunity_name, "start_date": start_date.strftime("%Y-%m-%d"),
+            "company_name": company_name_final, "vertical_industry": vertical_industry_final, "stage": "Open"
         }
         
-        # 5. SIAPKAN PRODUCT LINES
         final_product_lines = []
-        
         for line in st.session_state.product_lines:
             main_item = line.copy()
-            ui_keys = ['has_implementation', 'implementation_cost', 'implementation_service', 'implementation_notes_custom']
-            for key in ui_keys:
+            for key in ['has_implementation', 'implementation_cost', 'implementation_service', 'implementation_notes_custom']:
                 main_item.pop(key, None)
-            
             final_product_lines.append(main_item)
             
             if line.get('has_implementation'):
                 base_note = f"Implementation for {line['solution']}"
                 custom_note = line.get('implementation_notes_custom', '').strip()
                 final_note = f"{base_note} - {custom_note}" if custom_note else base_note
-
-                impl_item = {
-                    "pillar": line['pillar'],
-                    "solution": "Implementation Support",
-                    "service": line.get('implementation_service', 'InHouse'),
-                    "brand": line['brand'],
-                    "channel": line.get('channel'),
-                    "distributor_name": line.get('distributor_name'),
-                    "cost": line.get('implementation_cost', 0),
-                    "notes": final_note,
-                    "id": line['id'] + 99999,
+                final_product_lines.append({
+                    "pillar": line['pillar'], "solution": "Implementation Support", "service": line.get('implementation_service', 'InHouse'),
+                    "brand": line['brand'], "channel": line.get('channel'), "distributor_name": line.get('distributor_name'),
+                    "cost": line.get('implementation_cost', 0), "notes": final_note, "id": line['id'] + 99999,
                     "pillar_product": None, "solution_product": None
-                }
-                final_product_lines.append(impl_item)
+                })
         
-        # 6. EKSEKUSI KE BACKEND
         with st.spinner("🚀 Submitting to Database..."):
             res = db.add_multi_line_opportunity(parent_data, final_product_lines)
-            
             if res['status'] == 200:
-                # --- EMAIL LOGIC ---
                 if target_email_list:
                     try:
                         sol_html = "<ul>" + "".join([f"<li><b>{l['solution']}</b> ({l['brand']}) - Rp {format_number(l.get('cost',0))}</li>" for l in final_product_lines]) + "</ul>"
-                        email_body = f"""
-                        <h3>New Opportunity Created</h3>
-                        <p>
-                            <b>Customer:</b> {parent_data['company_name']}<br>
-                            <b>Sales:</b> {parent_data['sales_name']} ({parent_data['salesgroup_id']})<br>
-                            <b>Inputter:</b> {parent_data['presales_name']}
-                        </p>
-                        <hr>
-                        <p><b>Solution Details:</b></p>{sol_html}
-                        <p style="font-size: 10px; color: grey;">Generated by Presales App</p>
-                        """
+                        email_body = f"<h3>New Opportunity Created</h3><p><b>Customer:</b> {parent_data['company_name']}<br><b>Sales:</b> {parent_data['sales_name']} ({parent_data['salesgroup_id']})<br><b>Inputter:</b> {parent_data['presales_name']}</p><hr><p><b>Solution Details:</b></p>{sol_html}<p style='font-size: 10px; color: grey;'>Generated by Presales App</p>"
                         db.send_email_notification(target_email_string, f"[New Opp] {parent_data['opportunity_name']}", email_body)
                         st.toast(f"📧 Email notification sent!", icon="✅")
-                    except Exception as e:
-                        st.toast(f"⚠️ Data saved but email failed: {e}", icon="⚠️")
+                    except Exception as e: st.toast(f"⚠️ Data saved but email failed: {e}", icon="⚠️")
                 
-                # --- SET SUCCESS MESSAGE ---
                 st.session_state.submission_message = res['message']
                 st.session_state.new_uids = [x['uid'] for x in res.get('data', [])]
                 
-                # =========================================================
-                # 7. CLEAR FORM (RESET) - BAGIAN BARU
-                # =========================================================
-                
-                # A. Reset baris produk kembali ke 1 baris kosong
                 st.session_state.product_lines = [{"id": 0}]
-                
-                # B. Hapus key widget Header agar kembali ke default (kosong/index 0)
-                keys_to_clear = [
-                    "parent_opportunity_name",      # Reset Opportunity Name
-                    "parent_company_select",        # Reset Company Dropdown
-                    "parent_company_text_input",    # Reset Company Text Input
-                    "parent_salesgroup_id",         # Reset Sales Group (balik ke index 0)
-                    "parent_sales_name",            # Reset Sales Name
-                    "parent_start_date",            # Reset Date
-                    "pam_flexible_choice",          # Reset PAM choice
-                    "parent_vertical_industry_select" # Reset Vertical
-                ]
-                
+                keys_to_clear = ["parent_opportunity_name", "parent_company_select", "parent_company_text_input", "parent_salesgroup_id", "parent_sales_name", "parent_start_date", "pam_flexible_choice", "parent_vertical_industry_select"]
                 for key in keys_to_clear:
-                    if key in st.session_state:
-                        del st.session_state[key]
-
-                # C. Rerun untuk merender ulang halaman dengan state bersih
+                    if key in st.session_state: del st.session_state[key]
                 time.sleep(1.5) 
                 st.rerun()
-                
             else:
                 st.error(f"❌ Failed to submit: {res['message']}")
 
     if st.session_state.submission_message:
         st.success(st.session_state.submission_message)
-        if st.session_state.new_uids: 
-            st.info(f"Generated UIDs: {st.session_state.new_uids}")
+        if st.session_state.new_uids: st.info(f"Generated UIDs: {st.session_state.new_uids}")
         st.session_state.submission_message = None
         st.session_state.new_uids = None
 
@@ -749,20 +656,21 @@ def tab3():
             df = pd.DataFrame(raw_data)
             
             # =================================================================
-            # 🧹 PRE-PROCESSING DATA (Penting agar filter tidak error)
+            # 🧹 PRE-PROCESSING DATA
             # =================================================================
             
             # 1. Konversi Angka
             if 'cost' in df.columns:
                 df['cost'] = pd.to_numeric(df['cost'], errors='coerce').fillna(0)
             
-            # 2. Konversi Tanggal (untuk filter date range)
-            # Prioritas start_date, fallback ke created_at
+            # 2. Konversi Tanggal & SORTING AWAL (PENTING!)
             date_col = 'start_date' if 'start_date' in df.columns else 'created_at'
             if date_col in df.columns:
                 df['start_date_dt'] = pd.to_datetime(df[date_col], errors='coerce')
-
-            # 3. Isi nilai kosong dengan string "Unknown" agar multiselect tidak crash
+                # Sortir Default: Terbaru paling atas (Descending)
+                df = df.sort_values(by='start_date_dt', ascending=False)
+            
+            # 3. Isi nilai kosong dengan string "Unknown"
             fillna_cols = [
                 'presales_name', 'responsible_name', 'channel', 'brand', 'stage', 
                 'salesgroup_id', 'pillar', 'solution', 'company_name', 
@@ -778,7 +686,6 @@ def tab3():
             with st.container(border=True):
                 st.subheader("🔍 Filter Panel (Slicers)")
                 
-                # Helper function untuk mengambil opsi unik yang sudah diurutkan
                 def get_opts(col_name):
                     return sorted(df[col_name].unique()) if col_name in df.columns else []
 
@@ -804,7 +711,6 @@ def tab3():
                     sel_stage = st.multiselect("Stage", get_opts('stage'), placeholder="All Stages")
                 
                 with c12:
-                    # Filter Tanggal (Start Date)
                     min_date = df['start_date_dt'].min().date() if 'start_date_dt' in df.columns and not df['start_date_dt'].isnull().all() else None
                     max_date = df['start_date_dt'].max().date() if 'start_date_dt' in df.columns and not df['start_date_dt'].isnull().all() else None
                     
@@ -815,7 +721,6 @@ def tab3():
                     )
                 
                 with c13:
-                    # Search Text Manual (Opsional, pelengkap dropdown)
                     sel_opportunity = st.multiselect(
                         "Opportunity Name", 
                         get_opts('opportunity_name'), 
@@ -827,7 +732,6 @@ def tab3():
             # =================================================================
             df_filtered = df.copy()
 
-            # Terapkan filter secara bertahap
             if sel_inputter: df_filtered = df_filtered[df_filtered['presales_name'].isin(sel_inputter)]
             if sel_pam: df_filtered = df_filtered[df_filtered['responsible_name'].isin(sel_pam)]
             if sel_group: df_filtered = df_filtered[df_filtered['salesgroup_id'].isin(sel_group)]
@@ -840,7 +744,6 @@ def tab3():
             if sel_vertical: df_filtered = df_filtered[df_filtered['vertical_industry'].isin(sel_vertical)]
             if sel_stage: df_filtered = df_filtered[df_filtered['stage'].isin(sel_stage)]
             
-            # Filter Text Search Manual
             if sel_opportunity:
                 df_filtered = df_filtered[df_filtered['opportunity_name'].isin(sel_opportunity)]
             
@@ -850,19 +753,17 @@ def tab3():
                 df_filtered = df_filtered[mask]
 
             # =================================================================
-            # 📊 KPI CARDS (Summary Metrics)
+            # 📊 KPI CARDS
             # =================================================================
             st.markdown("### Summary")
             
             total_opps_lines = len(df_filtered)
-            
-            # Hitung Opportunity Unik (berdasarkan ID)
             total_unique_opps = df_filtered['opportunity_id'].nunique() if 'opportunity_id' in df_filtered.columns else 0
-
-            # Hitung Customer Unik
             total_unique_customers = df_filtered['company_name'].nunique() if 'company_name' in df_filtered.columns else 0
+            # KPI Total Value (Optional jika ingin diaktifkan)
+            total_value = df_filtered['cost'].sum() if 'cost' in df_filtered.columns else 0
 
-            m1, m2, m3, m4 = st.columns(4)
+            m1, m2, m3 = st.columns(3)
             m1.metric("Total Solution Lines", f"{total_opps_lines}")
             m2.metric("Unique Opportunities", f"{total_unique_opps}")
             m3.metric("Unique Customers", f"{total_unique_customers}")
@@ -870,13 +771,36 @@ def tab3():
             st.markdown("---")
 
             # =================================================================
-            # 📋 DATA TABLE
+            # 📋 DATA TABLE (FIX SORTING)
             # =================================================================
             st.subheader(f"Detailed Data ({total_opps_lines} rows)")
             
             if not df_filtered.empty:
-                # Gunakan fungsi cleaning yang sudah ada di utils.py
-                st.dataframe(clean_data_for_display(df_filtered), use_container_width=True)
+                # 1. Bersihkan data untuk display (Format angka, dll)
+                display_df = clean_data_for_display(df_filtered)
+                
+                # 2. FIX UTAMA: Timpa kolom 'start_date' dengan objek datetime asli
+                # Ini memaksa Streamlit menganggapnya sebagai Tanggal (bukan String)
+                if 'start_date_dt' in df_filtered.columns and 'start_date' in display_df.columns:
+                    display_df['start_date'] = df_filtered['start_date_dt']
+
+                # 3. Render dengan Column Config
+                st.dataframe(
+                    display_df, 
+                    use_container_width=True,
+                    column_config={
+                        # Format Date agar tampil "DD-MM-YYYY" tapi sorting tetap kalender
+                        "start_date": st.column_config.DateColumn(
+                            "Start Date",
+                            format="DD-MM-YYYY"
+                        ),
+                        # (Opsional) Format Cost biar rapi
+                        "cost": st.column_config.NumberColumn(
+                            "Cost (IDR)",
+                            format="Rp %.0f"
+                        )
+                    }
+                )
             else:
                 st.warning("Tidak ada data yang cocok dengan kombinasi filter di atas.")
 
