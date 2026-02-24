@@ -8,6 +8,8 @@ import re
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+import random
+import string
 
 # ==============================================================================
 # 1. KONEKSI DATABASE
@@ -178,39 +180,46 @@ def get_master_presales(action):
     return []
 
 def get_leads_by_group_logic(username):
+    """
+    Mengambil data berdasarkan Hak Akses (Territory-based Visibility).
+    Siapapun yang menginput, selama salesgroup_id sesuai wilayahnya, 
+    data akan muncul di dashboard tim terkait.
+    """
     try:
         with engine.connect() as conn:
-            # 1. Cek Grup User
-            check = conn.execute(text("SELECT access_group FROM presales WHERE presales_name = :u"), {"u": username}).mappings().first()
+            user_query = text("SELECT access_group FROM presales WHERE presales_name = :u")
+            user_data = conn.execute(user_query, {"u": username}).mappings().first()
             
-            if not check:
-                return {"status": 404, "data": []}
+            if not user_data:
+                return {"status": 403, "message": "User tidak memiliki access group."}
                 
-            user_group = check['access_group']
+            access_group = user_data['access_group']
+            base_query = "SELECT * FROM opportunities WHERE 1=1"
             
-            # --- LOGIKA: SUPER USER / TOP MGMT ---
-            if user_group == 'TOP_MGMT':
-                query = text("SELECT * FROM opportunities ORDER BY created_at DESC")
-                df = pd.read_sql(query, conn)
-                return {"status": 200, "data": df.to_dict('records')}
+            if access_group == 'ENT_1':
+                final_query = text(f"{base_query} AND salesgroup_id IN ('ENT1', 'SP1B')")
+                
+            elif access_group == 'ENT_2':
+                final_query = text(f"{base_query} AND salesgroup_id = 'ENT2'")
+                
+            elif access_group in ['SEC_TEAM', 'TOP_MGMT', 'DC_TEAM']:
+                final_query = text(base_query)
+                
+            else:
+                # Default fallback: Hanya bisa melihat data yang dia input sendiri
+                final_query = text(f"{base_query} AND presales_name = :u")
             
-            # --- LOGIKA: USER BIASA & SPESIALIS ---
-            query = text("""
-                SELECT o.* FROM opportunities o
-                LEFT JOIN presales p ON o.presales_name = p.presales_name
-                WHERE 
-                    p.access_group = :ug
-                    OR ( :ug = 'DC_TEAM'  AND o.pillar = 'Data Center' )
-                    OR ( :ug = 'SEC_TEAM' AND o.pillar = 'Cyber Security' )
-                    OR ( :ug = 'MS_TEAM'  AND o.pillar = 'Maintenance Services' )
-                ORDER BY o.created_at DESC
-            """)
+            # 4. Eksekusi Query
+            # Jika menggunakan parameter username untuk fallback
+            result = conn.execute(final_query, {"u": username}).mappings().fetchall()
             
-            df = pd.read_sql(query, conn, params={"ug": user_group})
-            return {"status": 200, "data": df.to_dict('records')}
+            # Konversi hasil query ke list of dictionary
+            data_list = [dict(row) for row in result]
+            
+            return {"status": 200, "data": data_list}
             
     except Exception as e:
-        return {"status": 500, "message": str(e), "data": []}
+        return {"status": 500, "message": f"Error fetching data: {str(e)}"}
 
 def get_single_lead(search_params):
     if "uid" in search_params:
@@ -725,3 +734,108 @@ def add_master_company(company_name, vertical_industry):
 
 #     except Exception as e:
 #         return {"status": 500, "message": str(e)}
+
+# ==============================================================================
+# SECTION 5: FORGOT PASSWORD LOGIC
+# ==============================================================================
+
+def request_password_reset_otp(email):
+    """
+    1. Cek email ada atau tidak.
+    2. Generate OTP 6 digit.
+    3. Simpan OTP & Expiry (5 menit) ke DB.
+    4. Kirim Email.
+    """
+    try:
+        # 1. Cek Email
+        with engine.begin() as conn:
+            user = conn.execute(text("SELECT presales_name FROM presales WHERE email = :e"), {"e": email}).mappings().first()
+            
+            if not user:
+                return {"status": 404, "message": "Email tidak terdaftar."}
+            
+            # 2. Generate OTP
+            otp = ''.join(random.choices(string.digits, k=6))
+            expiry_time = get_now_jakarta() + timedelta(minutes=5) # Berlaku 5 menit
+            
+            # 3. Simpan ke DB
+            conn.execute(
+                text("UPDATE presales SET otp_code = :otp, otp_expiry = :exp WHERE email = :e"),
+                {"otp": otp, "exp": expiry_time, "e": email}
+            )
+            
+            # 4. Kirim Email
+            subject = "Kode Verifikasi Reset Password (OTP)"
+            body_html = f"""
+            <h3>Permintaan Reset Password</h3>
+            <p>Halo {user['presales_name']},</p>
+            <p>Seseorang meminta untuk mereset password akun Presales App Anda.</p>
+            <h2 style="background: #f4f4f4; padding: 10px; text-align: center; letter-spacing: 5px;">{otp}</h2>
+            <p>Kode ini hanya berlaku selama 5 menit. Jangan berikan kode ini kepada siapapun.</p>
+            """
+            
+            # Panggil fungsi kirim email yang sudah ada
+            send_res = send_email_notification(email, subject, body_html)
+            
+            if send_res['status'] == 200:
+                return {"status": 200, "message": "OTP terkirim ke email Anda."}
+            else:
+                return {"status": 500, "message": "Gagal mengirim email (SMTP Error)."}
+
+    except Exception as e:
+        return {"status": 500, "message": str(e)}
+
+def verify_otp_and_reset_password(email, otp_input, new_password):
+    """
+    1. Cek kecocokan OTP.
+    2. Cek masa berlaku OTP.
+    3. Update Password Baru & Hapus OTP.
+    """
+    try:
+        with engine.begin() as conn:
+            # Ambil data user
+            user = conn.execute(
+                text("SELECT otp_code, otp_expiry FROM presales WHERE email = :e"), 
+                {"e": email}
+            ).mappings().first()
+            
+            if not user:
+                return {"status": 404, "message": "User tidak ditemukan."}
+            
+            db_otp = user['otp_code']
+            db_expiry = user['otp_expiry']
+            current_time = get_now_jakarta()
+            
+            # Validasi
+            if not db_otp:
+                return {"status": 400, "message": "Tidak ada permintaan reset password."}
+            
+            if db_otp != otp_input:
+                return {"status": 400, "message": "Kode OTP Salah!"}
+            
+            # Pastikan db_expiry adalah objek datetime agar bisa dibandingkan
+            if db_expiry and current_time > db_expiry:
+                return {"status": 400, "message": "Kode OTP sudah kadaluarsa. Silakan request ulang."}
+            
+            # Reset Password (PENTING: Di masa depan, gunakan Hashing untuk new_password)
+            conn.execute(
+                text("UPDATE presales SET password = :np, otp_code = NULL, otp_expiry = NULL WHERE email = :e"),
+                {"np": new_password, "e": email}
+            )
+            
+            return {"status": 200, "message": "Password berhasil diubah! Silakan login."}
+            
+    except Exception as e:
+        return {"status": 500, "message": str(e)}
+    
+def get_registered_emails():
+    """Mengambil daftar semua email unik dari tabel presales."""
+    try:
+        with engine.connect() as conn:
+            # Ambil email yang tidak kosong
+            query = text("SELECT DISTINCT email FROM presales WHERE email IS NOT NULL AND email != '' ORDER BY email")
+            result = conn.execute(query).fetchall()
+            return [row[0] for row in result]
+    except Exception as e:
+        print(f"Error fetching emails: {e}")
+        return []

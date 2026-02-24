@@ -553,7 +553,11 @@ def tab2():
     with st.spinner(f"Fetching data..."):
         res = db.get_leads_by_group_logic(current_user) 
         
-    if not res['data']:
+    if res.get('status') != 200:
+        st.error(f"Database Error: {res.get('message')}")
+        return
+        
+    if not res.get('data'):
         st.info("No data found for your group.")
         return
 
