@@ -235,23 +235,60 @@ def tab1(default_inputter=None):
     parent_col1, parent_col2 = st.columns(2)
     
     with parent_col1:
-        # 1. Inputter
-        st.text_input("Inputter", value=current_user_name, disabled=True, key="parent_inputter_display")
-        selected_inputter_name = current_user_name
-        
-        # 2. PAM Logic
-        pam_rule = inputter_to_pam_map.get(selected_inputter_name, DEFAULT_PAM)
-        if pam_rule == "FLEKSIBEL":
-            pam_object = st.selectbox(
-                "Choose Presales Account Manager", 
-                get_master('getResponsibles'), 
-                format_func=lambda x: x.get("Responsible", "Unknown"), 
-                key="pam_flexible_choice"
+        # ==============================================================
+        # LOGIKA BARU: UNLOCK UNTUK TOP_MGMT
+        # ==============================================================
+        if current_access_group == 'TOP_MGMT':
+            st.info("🔓 Top Management Override Enabled")
+            
+            # 1. Ambil list Presales Name dari master data
+            # (Asumsi get_master('getPresales') mengembalikan list of dict dengan key 'PresalesName')
+            all_presales_raw = get_master('getPresales')
+            presales_list = sorted(list(set([p.get('PresalesName') for p in all_presales_raw if p.get('PresalesName')])))
+            
+            # 2. Ambil list PAM dari master data
+            # (Asumsi get_master('getResponsibles') mengembalikan list of dict dengan key 'Responsible')
+            all_responsibles_raw = get_master('getResponsibles')
+            responsibles_list = sorted(list(set([r.get('Responsible') for r in all_responsibles_raw if r.get('Responsible')])))
+            
+            # Tentukan default index untuk Inputter agar nama user saat ini tetap muncul pertama
+            default_idx = presales_list.index(current_user_name) if current_user_name in presales_list else 0
+            
+            # Tampilkan sebagai Selectbox (Dropdown)
+            selected_inputter_name = st.selectbox(
+                "Inputter (Override)", 
+                options=presales_list, 
+                index=default_idx, 
+                key="parent_inputter_override"
             )
-            responsible_name_final = pam_object.get('Responsible', '') if pam_object else ""
+            
+            responsible_name_final = st.selectbox(
+                "Presales Account Manager (Override)", 
+                options=responsibles_list, 
+                key="parent_pam_override"
+            )
+
+        # ==============================================================
+        # LOGIKA LAMA: AUTO-LOCK UNTUK USER BIASA (ENT_1, ENT_2, dll)
+        # ==============================================================
         else:
-            responsible_name_final = pam_rule
-            st.text_input("Presales Account Manager", value=responsible_name_final, disabled=True)
+            # 1. Inputter (Locked)
+            st.text_input("Inputter", value=current_user_name, disabled=True, key="parent_inputter_display")
+            selected_inputter_name = current_user_name
+            
+            # 2. PAM Logic (Locked or Flexible based on Mapping)
+            pam_rule = inputter_to_pam_map.get(selected_inputter_name, DEFAULT_PAM)
+            if pam_rule == "FLEKSIBEL":
+                pam_object = st.selectbox(
+                    "Choose Presales Account Manager", 
+                    get_master('getResponsibles'), 
+                    format_func=lambda x: x.get("Responsible", "Unknown"), 
+                    key="pam_flexible_choice"
+                )
+                responsible_name_final = pam_object.get('Responsible', '') if pam_object else ""
+            else:
+                responsible_name_final = pam_rule
+                st.text_input("Presales Account Manager", value=responsible_name_final, disabled=True)
 
         # 3. Sales Group
         # -----------------------------------------------------------
