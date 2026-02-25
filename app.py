@@ -137,7 +137,7 @@ def main_app():
     # --- Tabs Navigation ---
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
         "Add Opportunity", "View Opportunities", "Search Opportunity", 
-        "Update Opportunity", "Edit Opportunity", "Activity Log"
+        "Edit and Update Opportunity", "Update Stage", "Activity Log"
     ])
 
     # Memanggil Utils untuk konten setiap tab
@@ -155,7 +155,7 @@ def main_app():
 
     with tab5:
         utils.tab5()
-
+        
     with tab6:
         utils.tab6()
 

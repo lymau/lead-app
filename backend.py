@@ -11,6 +11,9 @@ from email.mime.multipart import MIMEMultipart
 import random
 import string
 
+# Inisialisasi Koneksi ke 'connections.postgresql' di secrets.toml
+conn = st.connection("postgresql", type="sql")
+
 # ==============================================================================
 # 1. KONEKSI DATABASE
 # ==============================================================================
@@ -580,6 +583,60 @@ def update_full_opportunity(payload):
             
     except Exception as e:
         return {"status": 500, "message": str(e)}
+    
+def update_opportunity_stage(opp_id, new_stage, user_actor):
+    """
+    Update Stage ke SEMUA baris (line items) yang memiliki opportunity_id yang sama.
+    Menggunakan conn.session bawaan Streamlit agar transaksi database lebih stabil.
+    """
+    try:
+        # Gunakan session bawaan Streamlit untuk menangani transaksi secara otomatis
+        with conn.session as session:
+            # 1. Ambil data lama (untuk Log)
+            q_check = text("""
+                SELECT stage, opportunity_name 
+                FROM opportunities 
+                WHERE opportunity_id = :oid 
+                LIMIT 1
+            """)
+            old_data = session.execute(q_check, {"oid": opp_id}).mappings().first()
+            
+            if not old_data:
+                return {"status": 404, "message": "Opportunity tidak ditemukan."}
+
+            old_stage = old_data['stage']
+            opp_name = old_data['opportunity_name']
+
+            # 2. Update Stage ke SEMUA baris dengan opportunity_id tersebut
+            upd_q = text("""
+                UPDATE opportunities 
+                SET stage = :stg, updated_at = NOW() 
+                WHERE opportunity_id = :oid
+            """)
+            session.execute(upd_q, {"stg": new_stage, "oid": opp_id})
+
+            # 3. Catat di Activity Log jika ada perubahan
+            if old_stage != new_stage:
+                log_q = text("""
+                    INSERT INTO activity_logs 
+                    (timestamp, opportunity_name, user_name, action, field, old_value, new_value)
+                    VALUES (NOW(), :oname, :usr, 'UPDATE STAGE', 'Stage', :old, :new)
+                """)
+                session.execute(log_q, {
+                    "oname": opp_name, 
+                    "usr": user_actor, 
+                    "old": str(old_stage), 
+                    "new": str(new_stage)
+                })
+
+            # Eksekusi dan simpan semua perubahan ke database
+            session.commit()
+            
+            return {"status": 200, "message": f"Stage seluruh baris untuk '{opp_name}' berhasil diubah menjadi {new_stage}."}
+
+    except Exception as e:
+        # Jika gagal, session otomatis di-rollback oleh Streamlit/SQLAlchemy
+        return {"status": 500, "message": f"Database Error: {str(e)}"}
 
 # def update_opportunity_stage_bulk_enhanced(opp_id, new_stage, notes, manual_date, user, closing_reason=None):
 #     try:
