@@ -235,26 +235,25 @@ def tab1(default_inputter=None):
     parent_col1, parent_col2 = st.columns(2)
     
     with parent_col1:
+        # --- SAFETY INJECTION ---
+        # Definisi nilai awal agar tidak terjadi UnboundLocalError
+        selected_inputter_name = current_user_name
+        responsible_name_final = ""
+
         # ==============================================================
-        # LOGIKA BARU: UNLOCK UNTUK TOP_MGMT
+        # LOGIKA 1: UNLOCK UNTUK TOP_MGMT (Bisa pilih semua orang)
         # ==============================================================
         if current_access_group == 'TOP_MGMT':
-            st.info("🔓 Top Management Override Enabled")
+            st.info("🔓 Top Management Override")
             
-            # 1. Ambil list Presales Name dari master data
-            # (Asumsi get_master('getPresales') mengembalikan list of dict dengan key 'PresalesName')
             all_presales_raw = get_master('getPresales')
-            presales_list = sorted(list(set([p.get('PresalesName') for p in all_presales_raw if p.get('PresalesName')])))
+            presales_list = sorted(list(set([p.get('PresalesName') for p in all_presales_raw if isinstance(p, dict) and p.get('PresalesName')])))
             
-            # 2. Ambil list PAM dari master data
-            # (Asumsi get_master('getResponsibles') mengembalikan list of dict dengan key 'Responsible')
             all_responsibles_raw = get_master('getResponsibles')
-            responsibles_list = sorted(list(set([r.get('Responsible') for r in all_responsibles_raw if r.get('Responsible')])))
+            responsibles_list = sorted(list(set([r.get('Responsible') for r in all_responsibles_raw if isinstance(r, dict) and r.get('Responsible')])))
             
-            # Tentukan default index untuk Inputter agar nama user saat ini tetap muncul pertama
             default_idx = presales_list.index(current_user_name) if current_user_name in presales_list else 0
             
-            # Tampilkan sebagai Selectbox (Dropdown)
             selected_inputter_name = st.selectbox(
                 "Inputter (Override)", 
                 options=presales_list, 
@@ -267,83 +266,93 @@ def tab1(default_inputter=None):
                 options=responsibles_list, 
                 key="parent_pam_override"
             )
-            
+
+        # ==============================================================
+        # LOGIKA 2: UNLOCK UNTUK TEAM LEAD (Otto Erdianthoko / DC_TEAM)
+        # ==============================================================
         elif current_user_name == 'Otto Erdianthoko' or current_access_group == 'DC_TEAM':
-            st.info("🔓 Team Lead Override Enabled (DC TEAM)")
+            st.info("🔓 Team Lead Override (DC TEAM)")
             
-            # 1. Ambil list Presales dan filter khusus untuk DC_TEAM
             all_presales_raw = get_master('getPresales')
+            dc_team_list = []
             
-            # Jika database master presales Anda memiliki kolom penanda grup (misal: 'Group' atau 'AccessGroup'):
-            dc_team_list = [p.get('PresalesName') for p in all_presales_raw if p.get('Group') == 'DC_TEAM' or p.get('AccessGroup') == 'DC_TEAM']
+            if all_presales_raw:
+                for p in all_presales_raw:
+                    if isinstance(p, dict):
+                        p_name = p.get('PresalesName')
+                        p_group = p.get('Group') or p.get('AccessGroup')
+                        if p_name and p_group == 'DC_TEAM':
+                            dc_team_list.append(p_name)
             
-            # Jika database master presales belum memiliki kolom grup, Anda bisa mendefinisikan list anggotanya secara manual di bawah ini:
             if not dc_team_list:
-                dc_team_list = [
-                    "Otto Erdianthoko", 
-                    "Beni Septian", 
-                    "Budi Ezeddin",
-                    'Kriswanto Purwoko',
-                    'Nanda Bintarto'  
-                ]
+                dc_team_list = ["Otto Erdianthoko", "Beni Septian", "Budi Ezeddin", "Kriswanto Purwoko", "Nanda Bintarto"]
                 
-            dc_team_list = sorted(list(set(dc_team_list)))
+            dc_team_list = sorted(list(set([str(name) for name in dc_team_list if name])))
             default_idx = dc_team_list.index(current_user_name) if current_user_name in dc_team_list else 0
             
-            # Tampilkan Dropdown yang hanya berisi anggota DC_TEAM
             selected_inputter_name = st.selectbox(
                 "Inputter (DC Team Override)", 
                 options=dc_team_list, 
                 index=default_idx, 
                 key="parent_inputter_override_dc"
             )
+            
+            pam_rule = inputter_to_pam_map.get(selected_inputter_name, DEFAULT_PAM)
+            if pam_rule == "FLEKSIBEL":
+                responsibles_data = get_master('getResponsibles')
+                pam_object = st.selectbox(
+                    "Choose Presales Account Manager", 
+                    options=responsibles_data if responsibles_data else [], 
+                    format_func=lambda x: x.get("Responsible", "Unknown") if isinstance(x, dict) else str(x), 
+                    key="pam_flexible_choice_dc"
+                )
+                responsible_name_final = pam_object.get('Responsible', '') if isinstance(pam_object, dict) else ""
+            else:
+                responsible_name_final = pam_rule
+                st.text_input("Presales Account Manager", value=responsible_name_final, disabled=True, key="pam_locked_dc")
 
+        # ==============================================================
+        # LOGIKA 3: AUTO-LOCK UNTUK USER BIASA (ENT_1, ENT_2, SP1A, dll)
+        # ==============================================================
         else:
-            # 1. Inputter (Locked)
             st.text_input("Inputter", value=current_user_name, disabled=True, key="parent_inputter_display")
             selected_inputter_name = current_user_name
             
-            # 2. PAM Logic (Locked or Flexible based on Mapping)
             pam_rule = inputter_to_pam_map.get(selected_inputter_name, DEFAULT_PAM)
             if pam_rule == "FLEKSIBEL":
+                responsibles_data = get_master('getResponsibles')
                 pam_object = st.selectbox(
                     "Choose Presales Account Manager", 
-                    get_master('getResponsibles'), 
-                    format_func=lambda x: x.get("Responsible", "Unknown"), 
+                    options=responsibles_data if responsibles_data else [], 
+                    format_func=lambda x: x.get("Responsible", "Unknown") if isinstance(x, dict) else str(x), 
                     key="pam_flexible_choice"
                 )
-                responsible_name_final = pam_object.get('Responsible', '') if pam_object else ""
+                responsible_name_final = pam_object.get('Responsible', '') if isinstance(pam_object, dict) else ""
             else:
                 responsible_name_final = pam_rule
-                st.text_input("Presales Account Manager", value=responsible_name_final, disabled=True)
+                st.text_input("Presales Account Manager", value=responsible_name_final, disabled=True, key="pam_locked_biasa")
 
+        # -----------------------------------------------------------
+        # 3. Sales Group
+        # -----------------------------------------------------------
         all_sg_options = get_sales_groups()
         
         # LOGIKA FILTER BERTINGKAT
         if current_access_group == 'ENT_1':
-            # Rule 1: ENT_1 hanya boleh lihat ENT1 dan SP1B
             final_sg_options = [sg for sg in all_sg_options if sg in ['ENT1', 'SP1B']]
             if not final_sg_options: final_sg_options = all_sg_options
-
         elif current_access_group == '2ND_TIER':
-            # Rule 2: 2ND_TIER dipaksa LOCK ke SP2B
             final_sg_options = ['SP2B']
-
         elif current_access_group == 'ENT_2':
-            # Rule 3: ENT_2 dipaksa LOCK ke ENT2 [NEW RULE]
             final_sg_options = ['ENT2']
-            
         else:
-            # Rule Default: User lain (Admin/General) lihat semua
             final_sg_options = all_sg_options
             
         salesgroup_id = st.selectbox("Choose Sales Group", final_sg_options, key="parent_salesgroup_id")
-        # -----------------------------------------------------------
         
         # 4. Sales Name
         sales_name_options = get_sales_name_by_sales_group(salesgroup_id)
         sales_name = st.selectbox("Choose Sales Name", sales_name_options, key="parent_sales_name")
-
 
     with parent_col2:
         # 6. Opportunity Name
