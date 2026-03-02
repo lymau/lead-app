@@ -267,10 +267,37 @@ def tab1(default_inputter=None):
                 options=responsibles_list, 
                 key="parent_pam_override"
             )
+            
+        elif current_user_name == 'Otto Erdianthoko' or current_access_group == 'DC_TEAM':
+            st.info("🔓 Team Lead Override Enabled (DC TEAM)")
+            
+            # 1. Ambil list Presales dan filter khusus untuk DC_TEAM
+            all_presales_raw = get_master('getPresales')
+            
+            # Jika database master presales Anda memiliki kolom penanda grup (misal: 'Group' atau 'AccessGroup'):
+            dc_team_list = [p.get('PresalesName') for p in all_presales_raw if p.get('Group') == 'DC_TEAM' or p.get('AccessGroup') == 'DC_TEAM']
+            
+            # Jika database master presales belum memiliki kolom grup, Anda bisa mendefinisikan list anggotanya secara manual di bawah ini:
+            if not dc_team_list:
+                dc_team_list = [
+                    "Otto Erdianthoko", 
+                    "Beni Septian", 
+                    "Budi Ezeddin",
+                    'Kriswanto Purwoko',
+                    'Nanda Bintarto'  
+                ]
+                
+            dc_team_list = sorted(list(set(dc_team_list)))
+            default_idx = dc_team_list.index(current_user_name) if current_user_name in dc_team_list else 0
+            
+            # Tampilkan Dropdown yang hanya berisi anggota DC_TEAM
+            selected_inputter_name = st.selectbox(
+                "Inputter (DC Team Override)", 
+                options=dc_team_list, 
+                index=default_idx, 
+                key="parent_inputter_override_dc"
+            )
 
-        # ==============================================================
-        # LOGIKA LAMA: AUTO-LOCK UNTUK USER BIASA (ENT_1, ENT_2, dll)
-        # ==============================================================
         else:
             # 1. Inputter (Locked)
             st.text_input("Inputter", value=current_user_name, disabled=True, key="parent_inputter_display")
@@ -290,8 +317,6 @@ def tab1(default_inputter=None):
                 responsible_name_final = pam_rule
                 st.text_input("Presales Account Manager", value=responsible_name_final, disabled=True)
 
-        # 3. Sales Group
-        # -----------------------------------------------------------
         all_sg_options = get_sales_groups()
         
         # LOGIKA FILTER BERTINGKAT
