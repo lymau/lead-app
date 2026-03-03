@@ -727,6 +727,26 @@ def add_master_company(company_name, vertical_industry):
                 return {"status": 200, "message": "Company already exists."}
     except Exception as e:
         return {"status": 500, "message": f"Failed to add company: {str(e)}"}
+    
+def add_master_distributor(distributor_name):
+    """
+    Inserts a new distributor name into the master list table.
+    """
+    try:
+        # Prevent adding empty names
+        if not distributor_name:
+             return {"status": 400, "message": "Distributor name cannot be empty."}
+             
+        # Add your own logic to check if it already exists to prevent duplicates
+        
+        with engine.begin() as conn:
+            # Adjust 'master_distributors' and 'distributor_name' to your actual table/column names
+            query = text("INSERT INTO distributors (distributor_name) VALUES (:name)")
+            conn.execute(query, {"name": distributor_name})
+            
+        return {"status": 200, "message": "Success"}
+    except Exception as e:
+        return {"status": 500, "message": str(e)}
 
 # ==============================================================================
 # SECTION 4: CPS OPPORTUNITY LOGIC (NEW TAB 7)

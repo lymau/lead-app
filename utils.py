@@ -481,12 +481,48 @@ def tab1(default_inputter=None):
                 else:
                     st.caption(f"Reads: Rp {format_number(final_cost_idr)}")
                 
-                # 6. Distributor Logic
-                is_via = st.radio("Via Distributor?", ("Yes", "No"), index=1, key=f"is_via_{line['id']}", horizontal=True)
-                if is_via == "Yes":
-                    line['distributor_name'] = st.selectbox("Distributor", dist_list, key=f"dist_{line['id']}")
+        
+            is_via = st.radio("Via Distributor?", ("Yes", "No"), index=1, key=f"is_via_{line['id']}", horizontal=True)
+            if is_via == "Yes":
+                # --- START OF NEW LOGIC ---
+                
+                # 6.a Ask if the distributor is already in the list
+                is_dist_listed = st.radio("Is the distributor listed?", ("Yes", "No"), index=0, key=f"is_dist_listed_{line['id']}", horizontal=True)
+                
+                if is_dist_listed == "Yes":
+                    # Standard behavior: Select from the list
+                    line['distributor_name'] = st.selectbox(
+                        "Select Distributor", 
+                        options=dist_list, 
+                        key=f"dist_{line['id']}"
+                    )
                 else:
-                    line['distributor_name'] = "Not via distributor"
+                    # New behavior: Allow manual entry
+                    new_dist_name = st.text_input(
+                        "Enter New Distributor Name", 
+                        key=f"new_dist_{line['id']}"
+                    ).strip()
+                    
+                    # We assign it to the line dictionary
+                    line['distributor_name'] = new_dist_name
+                    
+                    # Save to database immediately if the user has typed something
+                    # Using a button ensures it doesn't trigger on every keystroke
+                    if new_dist_name:
+                        if st.button(f"Save '{new_dist_name}' to Database", key=f"save_dist_btn_{line['id']}"):
+                            with st.spinner("Saving new distributor..."):
+                                # Call your backend to add the name
+                                res = db.add_master_distributor(new_dist_name) 
+                                if res['status'] == 200:
+                                    st.success("New distributor added successfully!")
+                                    st.rerun() # Refresh to update the master list
+                                else:
+                                    st.error(res['message'])
+                                    
+                # --- END OF NEW LOGIC ---
+
+            else:
+                line['distributor_name'] = "Not via distributor"
 
             # --- IMPLEMENTATION SUPPORT ---
             excluded_pillars = ["Maintenance Services", "Managed Services"]
