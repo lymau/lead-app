@@ -209,7 +209,13 @@ def get_leads_by_group_logic(username):
             elif access_group == 'IOH_XL':
                 final_query = text(f"{base_query} AND presales_name IN (SELECT presales_name FROM presales WHERE access_group = 'IOH_XL')")
                 
-            elif access_group in ['SEC_TEAM', 'TOP_MGMT', 'DC_TEAM']:
+            elif access_group == 'SEC_TEAM':
+                final_query = text(f"{base_query} AND presales_name IN (SELECT presales_name FROM presales WHERE access_group = 'SEC_TEAM')")
+                
+            elif access_group == 'DC_TEAM':
+                final_query = text(f"{base_query} AND presales_name IN (SELECT presales_name FROM presales WHERE access_group = 'DC_TEAM')")
+                
+            elif access_group in ['TOP_MGMT']:
                 final_query = text(base_query)
                 
             else:
