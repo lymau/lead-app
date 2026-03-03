@@ -207,8 +207,7 @@ def get_leads_by_group_logic(username):
                 
             # --- TAMBAHAN LOGIKA BARU UNTUK IOH_XL (PAK DIMAS) ---
             elif access_group == 'IOH_XL':
-                # Membuka akses untuk data yang masuk ke grup IOH atau XL
-                final_query = text(f"{base_query}")
+                final_query = text(f"{base_query} AND presales_name IN (SELECT presales_name FROM presales WHERE access_group = 'IOH_XL')")
                 
             elif access_group in ['SEC_TEAM', 'TOP_MGMT', 'DC_TEAM']:
                 final_query = text(base_query)
