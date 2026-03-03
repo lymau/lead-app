@@ -212,6 +212,9 @@ def tab1(default_inputter=None):
             "Penetration Test", "ITDR", "Secure SD-WAN", "Secure Browser", 
             "Fraud Detection System", "Operational Technology (OT) Security", 
             "Training", "Local Material", "Others (Non Sub-Pillar)"
+        ],
+        "Others (Non Pillar)" : [
+            "Others (Non Sub-Pillar)", 'Local Material', "Training"
         ]
     }
     
