@@ -205,6 +205,11 @@ def get_leads_by_group_logic(username):
             elif access_group == 'ENT_2':
                 final_query = text(f"{base_query} AND salesgroup_id = 'ENT2'")
                 
+            # --- TAMBAHAN LOGIKA BARU UNTUK IOH_XL (PAK DIMAS) ---
+            elif access_group == 'IOH_XL':
+                # Membuka akses untuk data yang masuk ke grup IOH atau XL
+                final_query = text(f"{base_query} AND salesgroup_id IN ('SP2A)")
+                
             elif access_group in ['SEC_TEAM', 'TOP_MGMT', 'DC_TEAM']:
                 final_query = text(base_query)
                 
@@ -213,7 +218,7 @@ def get_leads_by_group_logic(username):
                 final_query = text(f"{base_query} AND presales_name = :u")
             
             # 4. Eksekusi Query
-            # Jika menggunakan parameter username untuk fallback
+            # Parameter "u" tetap di-passing untuk berjaga-jaga jika jatuh ke kondisi fallback
             result = conn.execute(final_query, {"u": username}).mappings().fetchall()
             
             # Konversi hasil query ke list of dictionary
