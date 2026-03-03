@@ -214,6 +214,18 @@ def get_leads_by_group_logic(username):
                 
             elif access_group == 'DC_TEAM':
                 final_query = text(f"{base_query} AND presales_name IN (SELECT presales_name FROM presales WHERE access_group = 'DC_TEAM')")
+            
+            elif access_group == 'NET_SPEC':
+                final_query = text(f"{base_query} AND presales_name IN (SELECT presales_name FROM presales WHERE access_group = 'NET_SPEC')")
+            
+            elif access_group == 'MS_TEAM':
+                final_query = text(f"{base_query} AND presales_name IN (SELECT presales_name FROM presales WHERE access_group = 'MS_TEAM')")
+                
+            elif access_group == '2ND_TIER':
+                final_query = text(f"{base_query} AND presales_name IN (SELECT presales_name FROM presales WHERE access_group = '2ND_TIER')")
+            
+            elif access_group == 'Herman_Group':
+                final_query = text(f"{base_query} AND presales_name IN (SELECT presales_name FROM presales WHERE access_group = 'Herman_Group')")
                 
             elif access_group in ['TOP_MGMT']:
                 final_query = text(base_query)
