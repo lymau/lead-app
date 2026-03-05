@@ -838,94 +838,94 @@ def add_master_distributor(distributor_name):
 # SECTION 5: FORGOT PASSWORD LOGIC
 # ==============================================================================
 
-def request_password_reset_otp(email):
-    """
-    1. Cek email ada atau tidak.
-    2. Generate OTP 6 digit.
-    3. Simpan OTP & Expiry (5 menit) ke DB.
-    4. Kirim Email.
-    """
-    try:
-        # 1. Cek Email
-        with engine.begin() as conn:
-            user = conn.execute(text("SELECT presales_name FROM presales WHERE email = :e"), {"e": email}).mappings().first()
+# def request_password_reset_otp(email):
+#     """
+#     1. Cek email ada atau tidak.
+#     2. Generate OTP 6 digit.
+#     3. Simpan OTP & Expiry (5 menit) ke DB.
+#     4. Kirim Email.
+#     """
+#     try:
+#         # 1. Cek Email
+#         with engine.begin() as conn:
+#             user = conn.execute(text("SELECT presales_name FROM presales WHERE email = :e"), {"e": email}).mappings().first()
             
-            if not user:
-                return {"status": 404, "message": "Email tidak terdaftar."}
+#             if not user:
+#                 return {"status": 404, "message": "Email tidak terdaftar."}
             
-            # 2. Generate OTP
-            otp = ''.join(random.choices(string.digits, k=6))
-            expiry_time = get_now_jakarta() + timedelta(minutes=5) # Berlaku 5 menit
+#             # 2. Generate OTP
+#             otp = ''.join(random.choices(string.digits, k=6))
+#             expiry_time = get_now_jakarta() + timedelta(minutes=5) # Berlaku 5 menit
             
-            # 3. Simpan ke DB
-            conn.execute(
-                text("UPDATE presales SET otp_code = :otp, otp_expiry = :exp WHERE email = :e"),
-                {"otp": otp, "exp": expiry_time, "e": email}
-            )
+#             # 3. Simpan ke DB
+#             conn.execute(
+#                 text("UPDATE presales SET otp_code = :otp, otp_expiry = :exp WHERE email = :e"),
+#                 {"otp": otp, "exp": expiry_time, "e": email}
+#             )
             
-            # 4. Kirim Email
-            subject = "Kode Verifikasi Reset Password (OTP)"
-            body_html = f"""
-            <h3>Permintaan Reset Password</h3>
-            <p>Halo {user['presales_name']},</p>
-            <p>Seseorang meminta untuk mereset password akun Presales App Anda.</p>
-            <h2 style="background: #f4f4f4; padding: 10px; text-align: center; letter-spacing: 5px;">{otp}</h2>
-            <p>Kode ini hanya berlaku selama 5 menit. Jangan berikan kode ini kepada siapapun.</p>
-            """
+#             # 4. Kirim Email
+#             subject = "Kode Verifikasi Reset Password (OTP)"
+#             body_html = f"""
+#             <h3>Permintaan Reset Password</h3>
+#             <p>Halo {user['presales_name']},</p>
+#             <p>Seseorang meminta untuk mereset password akun Presales App Anda.</p>
+#             <h2 style="background: #f4f4f4; padding: 10px; text-align: center; letter-spacing: 5px;">{otp}</h2>
+#             <p>Kode ini hanya berlaku selama 5 menit. Jangan berikan kode ini kepada siapapun.</p>
+#             """
             
-            # Panggil fungsi kirim email yang sudah ada
-            send_res = send_email_notification(email, subject, body_html)
+#             # Panggil fungsi kirim email yang sudah ada
+#             send_res = send_email_notification(email, subject, body_html)
             
-            if send_res['status'] == 200:
-                return {"status": 200, "message": "OTP terkirim ke email Anda."}
-            else:
-                return {"status": 500, "message": "Gagal mengirim email (SMTP Error)."}
+#             if send_res['status'] == 200:
+#                 return {"status": 200, "message": "OTP terkirim ke email Anda."}
+#             else:
+#                 return {"status": 500, "message": "Gagal mengirim email (SMTP Error)."}
 
-    except Exception as e:
-        return {"status": 500, "message": str(e)}
+#     except Exception as e:
+#         return {"status": 500, "message": str(e)}
 
-def verify_otp_and_reset_password(email, otp_input, new_password):
-    """
-    1. Cek kecocokan OTP.
-    2. Cek masa berlaku OTP.
-    3. Update Password Baru & Hapus OTP.
-    """
-    try:
-        with engine.begin() as conn:
-            # Ambil data user
-            user = conn.execute(
-                text("SELECT otp_code, otp_expiry FROM presales WHERE email = :e"), 
-                {"e": email}
-            ).mappings().first()
+# def verify_otp_and_reset_password(email, otp_input, new_password):
+#     """
+#     1. Cek kecocokan OTP.
+#     2. Cek masa berlaku OTP.
+#     3. Update Password Baru & Hapus OTP.
+#     """
+#     try:
+#         with engine.begin() as conn:
+#             # Ambil data user
+#             user = conn.execute(
+#                 text("SELECT otp_code, otp_expiry FROM presales WHERE email = :e"), 
+#                 {"e": email}
+#             ).mappings().first()
             
-            if not user:
-                return {"status": 404, "message": "User tidak ditemukan."}
+#             if not user:
+#                 return {"status": 404, "message": "User tidak ditemukan."}
             
-            db_otp = user['otp_code']
-            db_expiry = user['otp_expiry']
-            current_time = get_now_jakarta()
+#             db_otp = user['otp_code']
+#             db_expiry = user['otp_expiry']
+#             current_time = get_now_jakarta()
             
-            # Validasi
-            if not db_otp:
-                return {"status": 400, "message": "Tidak ada permintaan reset password."}
+#             # Validasi
+#             if not db_otp:
+#                 return {"status": 400, "message": "Tidak ada permintaan reset password."}
             
-            if db_otp != otp_input:
-                return {"status": 400, "message": "Kode OTP Salah!"}
+#             if db_otp != otp_input:
+#                 return {"status": 400, "message": "Kode OTP Salah!"}
             
-            # Pastikan db_expiry adalah objek datetime agar bisa dibandingkan
-            if db_expiry and current_time > db_expiry:
-                return {"status": 400, "message": "Kode OTP sudah kadaluarsa. Silakan request ulang."}
+#             # Pastikan db_expiry adalah objek datetime agar bisa dibandingkan
+#             if db_expiry and current_time > db_expiry:
+#                 return {"status": 400, "message": "Kode OTP sudah kadaluarsa. Silakan request ulang."}
             
-            # Reset Password (PENTING: Di masa depan, gunakan Hashing untuk new_password)
-            conn.execute(
-                text("UPDATE presales SET password = :np, otp_code = NULL, otp_expiry = NULL WHERE email = :e"),
-                {"np": new_password, "e": email}
-            )
+#             # Reset Password (PENTING: Di masa depan, gunakan Hashing untuk new_password)
+#             conn.execute(
+#                 text("UPDATE presales SET password = :np, otp_code = NULL, otp_expiry = NULL WHERE email = :e"),
+#                 {"np": new_password, "e": email}
+#             )
             
-            return {"status": 200, "message": "Password berhasil diubah! Silakan login."}
+#             return {"status": 200, "message": "Password berhasil diubah! Silakan login."}
             
-    except Exception as e:
-        return {"status": 500, "message": str(e)}
+#     except Exception as e:
+#         return {"status": 500, "message": str(e)}
     
 def get_registered_emails():
     """Mengambil daftar semua email unik dari tabel presales."""
