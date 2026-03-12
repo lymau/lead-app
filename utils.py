@@ -54,22 +54,15 @@ def get_channels(brand):
     
     df = pd.DataFrame(data)
     
-    # Pastikan kolom yang dicari ada
     if 'Brand' not in df.columns or 'Channel' not in df.columns:
         return []
         
-    # Filter data berdasarkan Brand
     subset = df[df['Brand'] == brand]
-    
     if subset.empty:
         return []
         
-    # Ambil nilai unik, buang yang NaN/None
     raw_channels = subset['Channel'].dropna().unique().tolist()
-    
-    # FILTER PENTING: Buang string kosong ("") atau spasi (" ")
     clean_channels = [c for c in raw_channels if c and str(c).strip() != ""]
-    
     return sorted(clean_channels)
 
 def get_pillars():
@@ -105,7 +98,7 @@ def get_sales_name_by_sales_group(sales_group):
     return sorted(df['SalesName'].unique().tolist())
 
 # ==============================================================================
-# 2. DATA CLEANING & FORMATTING (CRITICAL FIX FOR DATETIME ERROR)
+# 2. DATA CLEANING & FORMATTING
 # ==============================================================================
 
 def clean_data_for_display(data):
@@ -113,7 +106,6 @@ def clean_data_for_display(data):
     Membersihkan dan memformat data untuk st.dataframe.
     Memperbaiki error 'Can only use .dt accessor with datetimelike values'.
     """
-    # 1. Handle Input Type
     if isinstance(data, pd.DataFrame):
         if data.empty: return pd.DataFrame()
         df = data.copy()
@@ -133,31 +125,21 @@ def clean_data_for_display(data):
     
     df = df[existing_cols].copy()
 
-    # 2. Format Angka (Cost)
     for col in ['cost', 'selling_price']:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
             df[col] = df[col].apply(lambda x: f"Rp {format_number(x)}")
 
-    # 3. Format Tanggal (FIXED LOGIC)
-    # Backend sudah menyimpan waktu WIB (+7). Kita tidak perlu convert timezone lagi.
-    # Cukup pastikan tipe datanya datetime, lalu format ke string.
     for date_col in ['start_date', 'created_at', 'updated_at']:
         if date_col in df.columns:
             try:
-                # A. Paksa ubah ke datetime object (Error -> NaT)
                 df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
-                
-                # B. Format ke String yang mudah dibaca
                 if date_col == 'start_date':
-                    # Format Tanggal Saja
                     df[date_col] = df[date_col].apply(lambda x: x.strftime('%d-%m-%Y') if pd.notnull(x) else "-")
                 else:
-                    # Format Tanggal + Jam
                     df[date_col] = df[date_col].apply(lambda x: x.strftime('%d-%m-%Y %H:%M') if pd.notnull(x) else "-")
             except Exception:
-                pass # Jika gagal, biarkan apa adanya
-
+                pass
     return df
 
 # ==============================================================================
@@ -166,7 +148,6 @@ def clean_data_for_display(data):
 
 @st.fragment
 def tab1(default_inputter=None): 
-    # --- CSS INJECTION: UBAH TOMBOL PRIMARY JADI HIJAU ---
     st.markdown("""
         <style>
         div[data-testid="stButton"] > button[kind="primary"] {
@@ -239,12 +220,11 @@ def tab1(default_inputter=None):
     
     with parent_col1:
         # --- SAFETY INJECTION ---
-        # Definisi nilai awal agar tidak terjadi UnboundLocalError
         selected_inputter_name = current_user_name
         responsible_name_final = ""
 
         # ==============================================================
-        # LOGIKA 1: UNLOCK UNTUK TOP_MGMT (Bisa pilih semua orang)
+        # LOGIKA 1: UNLOCK UNTUK TOP_MGMT
         # ==============================================================
         if current_access_group == 'TOP_MGMT':
             st.info("🔓 Top Management Override")
@@ -465,7 +445,7 @@ def tab1(default_inputter=None):
 
                 if currency == "USD":
                     if line.get("brand") == "Cisco":
-                        discounted_usd = input_val * 0.5
+                        discounted_usd = input_val * 0.6
                         final_cost_idr = discounted_usd * current_rate
                         calc_info = f"ℹ️ **Cisco Logic:** ${input_val:,.0f} x 50% Disc = ${discounted_usd:,.0f} x (Rate Rp {current_rate:,.0f})"
                     else:
@@ -655,7 +635,7 @@ def tab1(default_inputter=None):
                 keys_to_clear = ["parent_opportunity_name", "parent_company_select", "parent_company_text_input", "parent_salesgroup_id", "parent_sales_name", "parent_start_date", "pam_flexible_choice", "parent_vertical_industry_select"]
                 for key in keys_to_clear:
                     if key in st.session_state: del st.session_state[key]
-                time.sleep(1.5) 
+                time.sleep(2) 
                 st.rerun()
             else:
                 st.error(f"❌ Failed to submit: {res['message']}")
@@ -1083,7 +1063,7 @@ def tab4():
             if currency == "USD":
                 brand_name = lead.get('brand', '').strip()
                 if brand_name.lower() == "cisco":
-                    discounted_usd = input_val * 0.5
+                    discounted_usd = input_val * 0.6
                     final_cost_idr = discounted_usd * current_rate
                     calc_info = f"ℹ️ **Cisco Logic (50% Disc):** ${input_val:,.0f} x 0.5 x {current_rate} = Rp {format_number(final_cost_idr)}"
                 else:
