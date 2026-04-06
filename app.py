@@ -10,7 +10,6 @@ st.set_page_config(
     layout="wide"
 )
 
-
 import time
 from logger_setup import logger
 import backend as db
@@ -132,7 +131,27 @@ def main_app():
             logger.info(f"LOGOUT: User '{username}' logged out.")
             st.session_state.presales_session = None
             st.rerun()
+            
+        # ==================================================================
+        # --- TAMBAHAN ADMIN TOOLS: INACTIVITY CHECKER ---
+        # ==================================================================
+        if username == 'Krisa Kurniawan':
+            st.markdown("---")
+            st.markdown("### 🛠️ Admin Tools")
+            if st.button("🚨 Run 1-Month Inactivity Check"):
+                with st.spinner("Checking database & sending email..."):
+                    res = db.check_and_remind_inactive_presales()
+                    if res['status'] == 200:
+                        if "Aman" in res['message']:
+                            st.success(res['message'])
+                        else:
+                            st.warning(res['message'])
+                    else:
+                        st.error(res['message'])
+        # ==================================================================
+
         st.markdown("---")
+        
 
     # --- Tabs Navigation ---
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
