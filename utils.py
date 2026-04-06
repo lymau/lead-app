@@ -115,7 +115,7 @@ def clean_data_for_display(data):
         df = pd.DataFrame(data)
 
     desired_order = [
-        'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'company_name', 
+        'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'route_to_market','company_name', 
         'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 
         'channel', 'distributor_name', 'cost', 'stage', 'notes', 'sales_notes', 'pillar_product', 'solution_product', 'created_at', 'updated_at'
     ]
@@ -320,7 +320,7 @@ def tab1(default_inputter=None):
         # -----------------------------------------------------------
         all_sg_options = get_sales_groups()
         
-        # LOGIKA FILTER BERTINGKAT
+        
         if current_access_group == 'ENT_1':
             final_sg_options = [sg for sg in all_sg_options if sg in ['ENT1', 'SP1B']]
             if not final_sg_options: final_sg_options = all_sg_options
@@ -338,6 +338,30 @@ def tab1(default_inputter=None):
         sales_name = st.selectbox("Choose Sales Name", sales_name_options, key="parent_sales_name")
 
     with parent_col2:
+        # --- LOGIKA BARU: B2B CHANNEL VS DIRECT ---
+        sales_approach = st.radio(
+            "Route to Market?", 
+            ("Direct", "B2B Channel"), 
+            horizontal=True, 
+            key="parent_route_to_market"
+        )
+        
+        b2b_channel_selected = None
+        if sales_approach == "B2B Channel":
+            b2b_channel_selected = st.selectbox(
+                "Select B2B Channel", 
+                ["Telkom", "iForte", "Penataran", "Icon+", "IOH", "XL", "Fiberstar", "Lintasarta", "Jasnikom", "PGASCOM", "Biznet", "Others"],
+                key="parent_b2b_channel"
+            )
+            # Ubah label menjadi End User
+            company_label = "End User"
+            is_listed_label = "Is the End User listed?"
+        else:
+            # Jika direct, label tetap Company
+            company_label = "Company"
+            is_listed_label = "Is the company listed?"
+            b2b_channel_selected = "Direct"
+
         # 6. Opportunity Name
         opp_raw = get_master('getOpportunities')
         opp_options = sorted([opt.get("Desc") for opt in opp_raw if opt.get("Desc")])
@@ -351,21 +375,24 @@ def tab1(default_inputter=None):
             placeholder="Choose or type new..."
         )
         
-        st.caption("Format: [B2B Channel] End User - Project Name - Month Year")
+        if sales_approach == "B2B Channel" and b2b_channel_selected:
+            st.caption(f"💡 Suggestion Format: [{b2b_channel_selected}] End User - Project Name - Month Year")
+        else:
+            st.caption("💡 Suggestion Format: [Direct] Company - Project Name - Month Year")
         
         start_date = st.date_input("Start Date", key="parent_start_date")
         
-        # 7. Company & Vertical
+        # 7. Company / End User & Vertical Industry
         all_companies = get_master('getCompanies')
         companies_df = pd.DataFrame(all_companies)
         
-        is_company_listed = st.radio("Is the company listed?", ("Yes", "No"), key="parent_is_company_listed", horizontal=True)
+        is_company_listed = st.radio(is_listed_label, ("Yes", "No"), key="parent_is_company_listed", horizontal=True)
         company_name_final = ""
         vertical_industry_final = ""
 
         if is_company_listed == "Yes":
             company_obj = st.selectbox(
-                "Choose Company", 
+                f"Choose {company_label}", 
                 all_companies, 
                 format_func=lambda x: x.get("Company", ""), 
                 key="parent_company_select"
@@ -376,7 +403,7 @@ def tab1(default_inputter=None):
             
             st.text_input("Vertical Industry", value=vertical_industry_final, disabled=True)
         else:
-            company_name_final = st.text_input("Company Name (if not listed)", key="parent_company_text_input")
+            company_name_final = st.text_input(f"New {company_label} Name", key="parent_company_text_input")
             if not companies_df.empty and 'Vertical Industry' in companies_df.columns:
                 unique_verts = sorted(companies_df['Vertical Industry'].dropna().astype(str).unique().tolist())
             else:
@@ -445,7 +472,7 @@ def tab1(default_inputter=None):
 
                 if currency == "USD":
                     if line.get("brand") == "Cisco":
-                        discounted_usd = input_val * 0.6
+                        discounted_usd = input_val * 0.4
                         final_cost_idr = discounted_usd * current_rate
                         calc_info = f"ℹ️ **Cisco Logic:** ${input_val:,.0f} x 50% Disc = ${discounted_usd:,.0f} x (Rate Rp {current_rate:,.0f})"
                     else:
@@ -573,12 +600,20 @@ def tab1(default_inputter=None):
         if is_company_listed == "No" and company_name_final:
             with st.spinner("Saving new company to master data..."):
                 db.add_master_company(company_name_final, vertical_industry_final)
+                
+        final_route = "Direct" if sales_approach == "Direct" else b2b_channel_selected
             
         parent_data = {
-            "presales_name": selected_inputter_name, "responsible_name": responsible_name_final,
-            "salesgroup_id": salesgroup_id, "sales_name": sales_name,
-            "opportunity_name": opportunity_name, "start_date": start_date.strftime("%Y-%m-%d"),
-            "company_name": company_name_final, "vertical_industry": vertical_industry_final, "stage": "Open"
+            "presales_name": selected_inputter_name, 
+            "responsible_name": responsible_name_final,
+            "salesgroup_id": salesgroup_id, 
+            "sales_name": sales_name,
+            "opportunity_name": opportunity_name, 
+            "start_date": start_date.strftime("%Y-%m-%d"),
+            "company_name": company_name_final, 
+            "vertical_industry": vertical_industry_final, 
+            "stage": "Open",
+            "route_to_market": final_route
         }
         
         final_product_lines = []
@@ -631,10 +666,29 @@ def tab1(default_inputter=None):
                 st.session_state.submission_message = res['message']
                 st.session_state.new_uids = [x['uid'] for x in res.get('data', [])]
                 
-                st.session_state.product_lines = [{"id": 0}]
-                keys_to_clear = ["parent_opportunity_name", "parent_company_select", "parent_company_text_input", "parent_salesgroup_id", "parent_sales_name", "parent_start_date", "pam_flexible_choice", "parent_vertical_industry_select"]
+                keys_to_clear = [
+                    "parent_opportunity_name", "parent_company_select", "parent_company_text_input", 
+                    "parent_salesgroup_id", "parent_sales_name", "parent_start_date", 
+                    "pam_flexible_choice", "parent_vertical_industry_select",
+                    "parent_inputter_override", "parent_pam_override",
+                    "parent_inputter_override_dc", "pam_flexible_choice_dc",
+                    "parent_route_to_market", "parent_b2b_channel", "parent_is_company_listed" # <--- Tambahan baru
+                ]
                 for key in keys_to_clear:
-                    if key in st.session_state: del st.session_state[key]
+                    if key in st.session_state: 
+                        del st.session_state[key]
+                        
+                prefixes_to_clear = [
+                    "pillar_", "pp_", "sp_", "solution_", "service_", "brand_", 
+                    "channel_", "curr_", "input_val_", "is_via_", "is_dist_listed_", 
+                    "dist_", "new_dist_", "chk_impl_", "impl_svc_", "impl_cost_", 
+                    "impl_note_", "notes_"
+                ]
+            
+                for key in list(st.session_state.keys()):
+                    if any(key.startswith(prefix) for prefix in prefixes_to_clear):
+                        del st.session_state[key]
+                st.session_state.product_lines = [{"id": 0}]
                 time.sleep(2) 
                 st.rerun()
             else:

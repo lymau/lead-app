@@ -198,8 +198,9 @@ def get_leads_by_group_logic(username):
                 
             access_group = user_data['access_group']
             base_query = "SELECT * FROM opportunities WHERE 1=1"
-            
-            if access_group == 'ENT_1':
+            if username == 'Ade Frianche':
+                final_query = text(f"{base_query} AND (salesgroup_id IN ('NET_SPEC', 'IOH_XL', '2ND_TIER') OR presales_name IN (SELECT presales_name FROM presales WHERE access_group IN ('NET_SPEC', 'IOH_XL', '2ND_TIER')))")
+            elif access_group == 'ENT_1':
                 final_query = text(f"{base_query} AND salesgroup_id IN ('ENT1', 'SP1B')")
                 
             elif access_group == 'ENT_2':
@@ -403,19 +404,21 @@ def add_multi_line_opportunity(parent_data, product_lines):
                 # Insert Detail
                 ins_opp = text("""
                     INSERT INTO opportunities (
-                        uid, opportunity_id, product_id, presales_name, salesgroup_id, sales_name, 
-                        responsible_name, opportunity_name, start_date, company_name, 
-                        vertical_industry, pillar, solution, service, 
-                        pillar_product, solution_product, 
-                        brand, channel, distributor_name, cost, notes, stage, created_at, updated_at
-                    ) VALUES (
-                        :uid, :oid, :pid, :pname, :sgid, :sname, 
-                        :pam, :oname, :sdate, :cname, 
-                        :vi, :plr, :sol, :svc, 
-                        :pp, :sp, 
-                        :br, :ch, :dist, :cost, :note, :stage_val, :now, :now
-                    )
-                """)
+                    uid, opportunity_id, product_id, presales_name, salesgroup_id, 
+                    sales_name, responsible_name, opportunity_name, start_date, 
+                    company_name, vertical_industry, pillar, solution, service, 
+                    pillar_product, solution_product, brand, channel, 
+                    distributor_name, cost, notes, stage, route_to_market, 
+                    created_at, updated_at
+                ) VALUES (
+                    :uid, :oid, :pid, :pname, :sgid, 
+                    :sname, :pam, :oname, :sdate, 
+                    :cname, :vi, :plr, :sol, :svc, 
+                    :pp, :sp, :br, :ch, 
+                    :dist, :cost, :note, :stage_val, :rtm, 
+                    :now, :now
+                )
+            """)
                 
                 conn.execute(ins_opp, {
                     "uid": uid, "oid": new_opp_id, "pid": product_id_code,
@@ -429,7 +432,8 @@ def add_multi_line_opportunity(parent_data, product_lines):
                     "br": line.get('brand'), "ch": line.get('channel'), "dist": line.get('distributor_name'), 
                     "cost": line.get('cost', 0), "note": line.get('notes', ''), 
                     "stage_val": parent_data.get('stage', 'Open'),
-                    "now": created_at
+                    "now": created_at,
+                    "rtm": parent_data.get('route_to_market', 'Direct')
                 })
                 
                 created_uids.append({"uid": uid, "opportunity_id": new_opp_id})
