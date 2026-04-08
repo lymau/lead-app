@@ -838,7 +838,7 @@ def tab3():
             fillna_cols = [
                 'presales_name', 'responsible_name', 'channel', 'brand', 'stage', 
                 'salesgroup_id', 'pillar', 'solution', 'company_name', 
-                'vertical_industry', 'opportunity_name', 'distributor_name'
+                'vertical_industry', 'opportunity_name', 'distributor_name', 'sales_name'
             ]
             for col in fillna_cols:
                 if col in df.columns:
@@ -854,27 +854,28 @@ def tab3():
                     return sorted(df[col_name].unique()) if col_name in df.columns else []
 
                 # Baris 1: Personil & Group
-                c1, c2, c3, c4, c5 = st.columns(5)
+                c1, c2, c3, c4, c5, c6 = st.columns(6)
                 with c1: sel_inputter = st.multiselect("Inputter", get_opts('presales_name'), placeholder="All Inputters")
                 with c2: sel_pam = st.multiselect("PAM", get_opts('responsible_name'), placeholder="All PAMs")
                 with c3: sel_group = st.multiselect("Sales Group", get_opts('salesgroup_id'), placeholder="All Groups")
-                with c4: sel_channel = st.multiselect("Channel", get_opts('channel'), placeholder="All Channels")
-                with c5: sel_distributor = st.multiselect("Distributor", get_opts('distributor_name'), placeholder="All Dist.")
+                with c4: sel_sales = st.multiselect("Sales Name", get_opts('sales_name'), placeholder="All Sales Names")
+                with c5: sel_channel = st.multiselect("Channel", get_opts('channel'), placeholder="All Channels")
+                with c6: sel_distributor = st.multiselect("Distributor", get_opts('distributor_name'), placeholder="All Dist.")
 
                 # Baris 2: Produk & Client
-                c6, c7, c8, c9, c10 = st.columns(5)
-                with c6: sel_brand = st.multiselect("Brand", get_opts('brand'), placeholder="All Brands")
-                with c7: sel_pillar = st.multiselect("Pillar", get_opts('pillar'), placeholder="All Pillars")
-                with c8: sel_solution = st.multiselect("Solution", get_opts('solution'), placeholder="All Solutions")
-                with c9: sel_client = st.multiselect("Client", get_opts('company_name'), placeholder="All Clients")
-                with c10: sel_vertical = st.multiselect("Vertical", get_opts('vertical_industry'), placeholder="All Verticals")
+                c7, c8, c9, c10, c11 = st.columns(5)
+                with c7: sel_brand = st.multiselect("Brand", get_opts('brand'), placeholder="All Brands")
+                with c8: sel_pillar = st.multiselect("Pillar", get_opts('pillar'), placeholder="All Pillars")
+                with c9: sel_solution = st.multiselect("Solution", get_opts('solution'), placeholder="All Solutions")
+                with c10: sel_client = st.multiselect("Client", get_opts('company_name'), placeholder="All Clients")
+                with c11: sel_vertical = st.multiselect("Vertical", get_opts('vertical_industry'), placeholder="All Verticals")
 
                 # Baris 3: Stage, Date, Opportunity Name
-                c11, c12, c13 = st.columns([1, 2, 3])
-                with c11: 
+                c12, c13, c14 = st.columns([1, 2, 3])
+                with c12: 
                     sel_stage = st.multiselect("Stage", get_opts('stage'), placeholder="All Stages")
                 
-                with c12:
+                with c13:
                     min_date = df['start_date_dt'].min().date() if 'start_date_dt' in df.columns and not df['start_date_dt'].isnull().all() else None
                     max_date = df['start_date_dt'].max().date() if 'start_date_dt' in df.columns and not df['start_date_dt'].isnull().all() else None
                     
@@ -884,7 +885,7 @@ def tab3():
                         help="Filter berdasarkan rentang tanggal Start Date"
                     )
                 
-                with c13:
+                with c14:
                     sel_opportunity = st.multiselect(
                         "Opportunity Name", 
                         get_opts('opportunity_name'), 
@@ -899,6 +900,7 @@ def tab3():
             if sel_inputter: df_filtered = df_filtered[df_filtered['presales_name'].isin(sel_inputter)]
             if sel_pam: df_filtered = df_filtered[df_filtered['responsible_name'].isin(sel_pam)]
             if sel_group: df_filtered = df_filtered[df_filtered['salesgroup_id'].isin(sel_group)]
+            if sel_sales: df_filtered = df_filtered[df_filtered['sales_name'].isin(sel_sales)]
             if sel_channel: df_filtered = df_filtered[df_filtered['channel'].isin(sel_channel)]
             if sel_distributor: df_filtered = df_filtered[df_filtered['distributor_name'].isin(sel_distributor)]
             if sel_brand: df_filtered = df_filtered[df_filtered['brand'].isin(sel_brand)]
