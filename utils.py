@@ -874,50 +874,80 @@ def tab3():
             # 🎛️ FILTER PANEL (SLICERS)
             # =================================================================
             with st.container(border=True):
-                st.subheader("🔍 Filter Panel (Slicers)")
                 
                 def get_opts(col_name):
                     return sorted(df[col_name].unique()) if col_name in df.columns else []
 
-                # Baris 1: Personil & Group
+                # --- PINDAHKAN LOGIKA TANGGAL KE SINI ---
+                # Agar bisa dibaca oleh fungsi reset di bawahnya
+                min_date = df['start_date_dt'].min().date() if 'start_date_dt' in df.columns and not df['start_date_dt'].isnull().all() else None
+                max_date = df['start_date_dt'].max().date() if 'start_date_dt' in df.columns and not df['start_date_dt'].isnull().all() else None
+
+                # --- HEADER & CLEAR BUTTON ---
+                col_title, col_btn = st.columns([0.85, 0.15])
+                with col_title:
+                    st.subheader("🔍 Filter Panel (Slicers)")
+                with col_btn:
+                    # Fungsi Callback untuk menghapus state filter secara EKSPLISIT
+                    def reset_filters():
+                        multiselect_keys = [
+                            'f_inputter', 'f_pam', 'f_group', 'f_sales', 'f_channel', 'f_dist',
+                            'f_brand', 'f_pillar', 'f_sol', 'f_client', 'f_vert', 'f_stage', 'f_opp'
+                        ]
+                        
+                        # Timpa value dengan array kosong (ini memaksa UI di browser untuk bersih)
+                        for key in multiselect_keys:
+                            if key in st.session_state:
+                                st.session_state[key] = []
+                        
+                        # Kembalikan kalender ke range default (min & max)
+                        if 'f_date' in st.session_state:
+                            st.session_state['f_date'] = (min_date, max_date) if min_date and max_date else None
+                    
+                    st.button("🧹 Clear All Filters", on_click=reset_filters, use_container_width=True)
+
+                # --- Baris 1: Personil & Group ---
                 c1, c2, c3, c4, c5, c6 = st.columns(6)
-                with c1: sel_inputter = st.multiselect("Inputter", get_opts('presales_name'), placeholder="All Inputters")
-                with c2: sel_pam = st.multiselect("PAM", get_opts('responsible_name'), placeholder="All PAMs")
-                with c3: sel_group = st.multiselect("Sales Group", get_opts('salesgroup_id'), placeholder="All Groups")
-                with c4: sel_sales = st.multiselect("Sales Name", get_opts('sales_name'), placeholder="All Sales Names")
-                with c5: sel_channel = st.multiselect("Channel", get_opts('channel'), placeholder="All Channels")
-                with c6: sel_distributor = st.multiselect("Distributor", get_opts('distributor_name'), placeholder="All Dist.")
+                with c1: sel_inputter = st.multiselect("Inputter", get_opts('presales_name'), placeholder="All Inputters", key="f_inputter")
+                with c2: sel_pam = st.multiselect("PAM", get_opts('responsible_name'), placeholder="All PAMs", key="f_pam")
+                with c3: sel_group = st.multiselect("Sales Group", get_opts('salesgroup_id'), placeholder="All Groups", key="f_group")
+                with c4: sel_sales = st.multiselect("Sales Name", get_opts('sales_name'), placeholder="All Sales", key="f_sales")
+                with c5: sel_channel = st.multiselect("Channel", get_opts('channel'), placeholder="All Channels", key="f_channel")
+                with c6: sel_distributor = st.multiselect("Distributor", get_opts('distributor_name'), placeholder="All Dist.", key="f_dist")
 
-                # Baris 2: Produk & Client
+                # --- Baris 2: Produk & Client ---
                 c7, c8, c9, c10, c11 = st.columns(5)
-                with c7: sel_brand = st.multiselect("Brand", get_opts('brand'), placeholder="All Brands")
-                with c8: sel_pillar = st.multiselect("Pillar", get_opts('pillar'), placeholder="All Pillars")
-                with c9: sel_solution = st.multiselect("Solution", get_opts('solution'), placeholder="All Solutions")
-                with c10: sel_client = st.multiselect("Client", get_opts('company_name'), placeholder="All Clients")
-                with c11: sel_vertical = st.multiselect("Vertical", get_opts('vertical_industry'), placeholder="All Verticals")
+                with c7: sel_brand = st.multiselect("Brand", get_opts('brand'), placeholder="All Brands", key="f_brand")
+                with c8: sel_pillar = st.multiselect("Pillar", get_opts('pillar'), placeholder="All Pillars", key="f_pillar")
+                with c9: sel_solution = st.multiselect("Solution", get_opts('solution'), placeholder="All Solutions", key="f_sol")
+                with c10: sel_client = st.multiselect("Client", get_opts('company_name'), placeholder="All Clients", key="f_client")
+                with c11: sel_vertical = st.multiselect("Vertical", get_opts('vertical_industry'), placeholder="All Verticals", key="f_vert")
 
-                # Baris 3: Stage, Date, Opportunity Name
+                # --- Baris 3: Stage, Date, Opportunity Name ---
                 c12, c13, c14 = st.columns([1, 2, 3])
                 with c12: 
-                    sel_stage = st.multiselect("Stage", get_opts('stage'), placeholder="All Stages")
+                    sel_stage = st.multiselect("Stage", get_opts('stage'), placeholder="All Stages", key="f_stage")
                 
                 with c13:
-                    min_date = df['start_date_dt'].min().date() if 'start_date_dt' in df.columns and not df['start_date_dt'].isnull().all() else None
-                    max_date = df['start_date_dt'].max().date() if 'start_date_dt' in df.columns and not df['start_date_dt'].isnull().all() else None
+                    # 1. Inisialisasi default ke dalam Session State (hanya jika belum ada)
+                    if 'f_date' not in st.session_state:
+                        st.session_state['f_date'] = (min_date, max_date) if min_date and max_date else None
                     
+                    # 2. Render Widget TANPA parameter value=
                     date_range = st.date_input(
                         "Start Date Range",
-                        value=(min_date, max_date) if min_date and max_date else None,
-                        help="Filter berdasarkan rentang tanggal Start Date"
+                        help="Filter berdasarkan rentang tanggal Start Date",
+                        key="f_date" # Parameter 'value' dihapus karena sudah di-handle oleh key ini
                     )
                 
                 with c14:
                     sel_opportunity = st.multiselect(
                         "Opportunity Name", 
                         get_opts('opportunity_name'), 
-                        placeholder="Select Opportunity Name..."
+                        placeholder="Select Opportunity Name...",
+                        key="f_opp"
                     )
-
+                    
             # =================================================================
             # 🔄 LOGIKA FILTERING (ENGINE)
             # =================================================================
