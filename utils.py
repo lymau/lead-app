@@ -741,7 +741,9 @@ def tab2():
     
     st.markdown("---")
     
-    # DETAIL VIEW
+    # =================================================================
+    # 1. DETAIL VIEW
+    # =================================================================
     if st.session_state.selected_kanban_opp_id:
         if st.button("⬅️ Back to Kanban View"):
             st.session_state.selected_kanban_opp_id = None
@@ -753,17 +755,26 @@ def tab2():
         if not detail_df.empty:
             header = detail_df.iloc[0]
             st.header(f"{header['opportunity_name']} ({header['company_name']})")
+            
+            # --- FIX: Tampilkan Grand Total di Detail View ---
+            total_kalkulasi = pd.to_numeric(detail_df['cost'], errors='coerce').fillna(0).sum()
+            st.info(f"**💰 Grand Total Cost:** Rp {format_number(total_kalkulasi)}")
+            # -------------------------------------------------
+            
             st.dataframe(clean_data_for_display(detail_df), use_container_width=True)
         else:
             st.warning("Details hidden by filter.")
             
-    # KANBAN BOARD
+    # =================================================================
+    # 2. KANBAN BOARD
+    # =================================================================
     else:
         if df_filtered.empty:
             st.warning("No data.")
         else:
             # Aggregate for Kanban Cards
             df_filtered['cost'] = pd.to_numeric(df_filtered['cost'], errors='coerce').fillna(0)
+            
             df_opps = df_filtered.groupby('opportunity_id').agg({
                 'opportunity_name': 'first',
                 'company_name': 'first',
@@ -788,9 +799,24 @@ def tab2():
                     for _, row in subset.iterrows():
                         with st.container(border=True):
                             st.markdown(f"**{row['opportunity_name']}**")
-                            st.caption(f"{row['company_name']} | {row['presales_name']}")
-                            st.markdown(f"💰 Rp {format_number(row['cost'])}")
-                            if st.button("View", key=f"btn_{row['opportunity_id']}"):
+                            st.caption(f"🏢 {row['company_name']} | 👤 {row['presales_name']}")
+                            
+                            # --- FIX: Memunculkan Rincian Detail di Kanban Card ---
+                            st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
+                            
+                            # Tarik data item khusus untuk opportunity ini
+                            items_in_opp = df_filtered[df_filtered['opportunity_id'] == row['opportunity_id']]
+                            for _, item in items_in_opp.iterrows():
+                                sol_name = item.get('solution', 'Unknown Solution')
+                                item_cost = item.get('cost', 0)
+                                st.markdown(f"<span style='font-size:13px;'>• {sol_name}: Rp {format_number(item_cost)}</span>", unsafe_allow_html=True)
+                            
+                            st.markdown("<hr style='margin: 8px 0;'>", unsafe_allow_html=True)
+                            # --------------------------------------------------------
+                            
+                            st.markdown(f"**💰 Total: Rp {format_number(row['cost'])}**")
+                            
+                            if st.button("View Detail", key=f"btn_{row['opportunity_id']}"):
                                 st.session_state.selected_kanban_opp_id = row['opportunity_id']
                                 st.rerun()
 
