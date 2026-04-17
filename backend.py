@@ -1014,7 +1014,7 @@ def check_and_remind_inactive_presales():
 def send_email_background(target_email, subject, body):
     # Membungkus fungsi kirim email ke dalam thread terpisah
     email_thread = threading.Thread(
-        target=db.send_email_notification, 
+        target=send_email_notification, 
         args=(target_email, subject, body)
     )
     email_thread.start() # Jalankan dan langsung lupakan (Fire and Forget)
