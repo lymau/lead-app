@@ -545,13 +545,14 @@ def update_full_opportunity(payload):
             ts_part = parts[-1]
             new_uid = f"{new_opp_id}-{new_product_id_code}-{ts_part}"
             
-            # 5. EXECUTE UPDATE
+            # 5. EXECUTE UPDATE (Penambahan start_date dan route_to_market)
             upd_q = text("""
                 UPDATE opportunities SET
                     uid=:nuid, opportunity_id=:noid, product_id=:npid,
                     salesgroup_id=:sg, sales_name=:sn,
                     responsible_name=:pam, pillar=:p, solution=:s, service=:svc,
                     brand=:b, company_name=:cn, vertical_industry=:vi, distributor_name=:dn,
+                    start_date=:sd, route_to_market=:rtm,
                     updated_at=NOW()
                 WHERE uid=:ouid
             """)
@@ -563,6 +564,8 @@ def update_full_opportunity(payload):
                 "s": payload['solution'], "svc": payload['service'],
                 "b": payload['brand'], "cn": payload['company_name'],
                 "vi": payload['vertical_industry'], "dn": payload['distributor_name'],
+                "sd": payload.get('start_date', old_data.get('start_date')),       # <-- Variabel Baru
+                "rtm": payload.get('route_to_market', old_data.get('route_to_market')), # <-- Variabel Baru
                 "ouid": payload['uid']
             })
             
@@ -576,12 +579,14 @@ def update_full_opportunity(payload):
                 'service': 'Service',
                 'brand': 'Brand',
                 'company_name': 'Company',
-                'distributor_name': 'Distributor'
+                'distributor_name': 'Distributor',
+                'start_date': 'Start Date',          # <-- Tracking Baru
+                'route_to_market': 'Route to Market' # <-- Tracking Baru
             }
             
             for db_field, label in fields_to_track.items():
-                old_val = str(old_data[db_field]) if old_data[db_field] else ""
-                new_val = str(payload[db_field]) if payload[db_field] else ""
+                old_val = str(old_data.get(db_field) or "")
+                new_val = str(payload.get(db_field) or "")
                 
                 if old_val != new_val:
                     current_ts = get_now_jakarta()
