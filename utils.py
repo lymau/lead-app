@@ -1193,17 +1193,6 @@ def tab4():
         # ---------------------------------------------------------
         with t_sales:
             st.markdown("##### Sales & Internal Info")
-            
-            # --- PENAMBAHAN: START DATE ---
-            try:
-                curr_date = pd.to_datetime(lead.get('start_date')).date() if lead.get('start_date') else pd.Timestamp.now().date()
-            except:
-                curr_date = pd.Timestamp.now().date()
-                
-            edited_start_date = st.date_input("Start Date", value=curr_date, key="edit_sd")
-            st.markdown("---")
-            # ------------------------------
-
             edited_sales_group = st.selectbox("Sales Group", all_sales_groups, 
                 index=get_index(all_sales_groups, lead.get('salesgroup_id')), key="edit_sg")
             
@@ -1240,23 +1229,7 @@ def tab4():
         # ---------------------------------------------------------
         with t_cust:
             st.markdown("##### Customer Info & Distributor")
-            
-            # --- PENAMBAHAN: ROUTE TO MARKET ---
-            current_rtm = lead.get('route_to_market', 'Direct')
-            is_b2b = current_rtm not in ["Direct", None, "", "Unknown"]
-            rtm_idx = 1 if is_b2b else 0
-            
-            sales_approach = st.radio("Route to Market?", ("Direct", "B2B Channel"), index=rtm_idx, horizontal=True, key="edit_rtm")
-            
-            final_rtm_value = "Direct"
-            if sales_approach == "B2B Channel":
-                channel_list = ["Telkom", "iForte", "Penataran", "Icon+", "IOH", "XL", "Fiberstar", "Lintasarta", "Jasnikom", "PGASCOM", "Biznet", "Others"]
-                c_idx = channel_list.index(current_rtm) if current_rtm in channel_list else 0
-                final_rtm_value = st.selectbox("Select B2B Channel", channel_list, index=c_idx, key="edit_b2b_chan")
-            st.markdown("---")
-            # -----------------------------------
-
-            edited_company = st.selectbox("Company / End User", all_companies_data, 
+            edited_company = st.selectbox("Company", all_companies_data, 
                 index=get_index(all_companies_data, lead.get('company_name'), 'Company'), 
                 format_func=lambda x: x.get("Company", "") if isinstance(x, dict) else str(x), key="edit_comp")
             
@@ -1278,7 +1251,7 @@ def tab4():
         st.markdown("---")
         if st.button("💾 Save All Changes", type="primary", use_container_width=True):
             with st.spinner("Saving changes to database..."):
-                # 1. Update Cost & Notes
+                # 1. Update Cost & Notes (Ex-Tab 4 logic)
                 res_cost = db.update_lead({
                     "uid": lead['uid'], 
                     "cost": final_cost_idr, 
@@ -1286,9 +1259,10 @@ def tab4():
                     "user": current_user_name 
                 })
 
+                # Persiapan variabel Final Brand untuk payload dan email
                 final_brand_str = edited_brand.get('Brand') if isinstance(edited_brand, dict) else edited_brand
 
-                # 2. Update Header Detail 
+                # 2. Update Header Detail (Ex-Tab 5 logic)
                 payload = lead.copy()
                 payload.update({
                     "salesgroup_id": edited_sales_group,
@@ -1301,33 +1275,36 @@ def tab4():
                     "company_name": edited_company.get('Company') if isinstance(edited_company, dict) else edited_company,
                     "vertical_industry": derived_vertical,
                     "distributor_name": final_dist,
-                    "start_date": edited_start_date.strftime("%Y-%m-%d"), # <-- Tambahan baru
-                    "route_to_market": final_rtm_value,                   # <-- Tambahan baru
                     "user": current_user_name
                 })
                 res_full = db.update_full_opportunity(payload)
                 
                 # Evaluasi Hasil
                 if res_cost['status'] == 200 and res_full['status'] == 200:
-                    st.session_state.edit_submission_message = "✅ Data Updated Successfully!"
+                    st.session_state.edit_submission_message = "✅ Data (Cost & Full Details) Updated Successfully!"
                     
                     # ==========================================================
-                    # --- LOGIKA EMAIL KE CHANNEL PIC ---
+                    # --- LOGIKA BARU: AUTO-NOTIFIKASI EMAIL KE CHANNEL PIC ---
                     # ==========================================================
                     try:
+                        # a. Ambil email map dari data Presales
                         presales_data = get_master('getPresales') 
                         email_map = {p['PresalesName']: p['Email'] for p in presales_data if p.get('Email')}
                         
+                        # b. Cari siapa nama Channel PIC untuk brand yang baru saja di-save
                         pic_name = None
                         for b in all_brands:
+                            # Mengakomodir nama key dari Master DB (Brand/brand_name)
                             b_name = b.get('Brand') or b.get('brand_name') 
                             if b_name == final_brand_str:
                                 pic_name = b.get('Channel') or b.get('channel')
                                 break
                         
+                        # c. Jika ada PIC-nya dan email-nya terdaftar, kirim email notifikasi
                         if pic_name and pic_name in email_map:
                             target_email = email_map[pic_name]
                             
+                            # Format rincian produk yang di-update
                             sol_details = f"<li><b>{payload['solution']}</b> ({final_brand_str}) - Rp {format_number(final_cost_idr)}</li>"
                             notes_html = f"<p><b>Latest Notes:</b> {new_notes}</p>" if new_notes else ""
                             
@@ -1336,7 +1313,6 @@ def tab4():
                             <p>Halo {pic_name}, terdapat perubahan data pada Opportunity berikut:</p>
                             <p>
                                 <b>Opportunity:</b> {payload['opportunity_name']}<br>
-                                <b>Route:</b> {final_rtm_value}<br>
                                 <b>Customer:</b> {payload['company_name']}<br>
                                 <b>Sales:</b> {payload['sales_name']} ({payload['salesgroup_id']})<br>
                                 <b>Updated By:</b> {current_user_name}
@@ -1353,7 +1329,7 @@ def tab4():
                                 f"[Update Opp] {payload['opportunity_name']}", 
                                 email_body
                             )
-                            st.toast(f"📧 Update notification sent to {pic_name}", icon="✅")
+                            st.toast(f"📧 Update notification sent to {pic_name} ({target_email})", icon="✅")
                     except Exception as e:
                         st.toast(f"⚠️ Data saved but email notification failed: {e}", icon="⚠️")
                     # ==========================================================
