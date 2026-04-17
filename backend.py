@@ -10,6 +10,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import random
 import string
+import threading
 
 # Inisialisasi Koneksi ke 'connections.postgresql' di secrets.toml
 conn = st.connection("postgresql", type="sql")
@@ -1009,3 +1010,11 @@ def check_and_remind_inactive_presales():
     except Exception as e:
         logger.error(f"Error in inactive reminder: {str(e)}")
         return {"status": 500, "message": f"Database Error: {str(e)}"}
+    
+def send_email_background(target_email, subject, body):
+    # Membungkus fungsi kirim email ke dalam thread terpisah
+    email_thread = threading.Thread(
+        target=db.send_email_notification, 
+        args=(target_email, subject, body)
+    )
+    email_thread.start() # Jalankan dan langsung lupakan (Fire and Forget)
