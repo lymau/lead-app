@@ -552,7 +552,6 @@ def update_full_opportunity(payload):
                     salesgroup_id=:sg, sales_name=:sn,
                     responsible_name=:pam, pillar=:p, solution=:s, service=:svc,
                     brand=:b, company_name=:cn, vertical_industry=:vi, distributor_name=:dn,
-                    start_date=:sd, route_to_market=:rtm,
                     updated_at=NOW()
                 WHERE uid=:ouid
             """)
