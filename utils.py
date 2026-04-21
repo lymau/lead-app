@@ -1233,6 +1233,12 @@ def tab4():
         # ---------------------------------------------------------
         with t_sales:
             st.markdown("##### Sales & Internal Info")
+            try:
+                curr_date = pd.to_datetime(lead.get('start_date')).date() if lead.get('start_date') else pd.Timestamp.now().date()
+            except:
+                curr_date = pd.Timestamp.now().date()
+            edited_start_date = st.date_input("Start Date", value=curr_date, format="DD/MM/YYYY", key="edit_sd")
+
             edited_sales_group = st.selectbox("Sales Group", all_sales_groups, 
                 index=get_index(all_sales_groups, lead.get('salesgroup_id')), key="edit_sg")
             
@@ -1269,6 +1275,14 @@ def tab4():
         # ---------------------------------------------------------
         with t_cust:
             st.markdown("##### Customer Info & Distributor")
+            current_rtm = lead.get('route_to_market', 'Direct')
+            edited_rtm = st.selectbox(
+                "Route to Market", 
+                options=["Direct", "B2B Channel", "Telkom", "iForte", "Penataran", "Others"], 
+                index=0 if current_rtm == 'Direct' else None, # Logika index disesuaikan
+                key="edit_rtm"
+            )
+            
             edited_company = st.selectbox("Company", all_companies_data, 
                 index=get_index(all_companies_data, lead.get('company_name'), 'Company'), 
                 format_func=lambda x: x.get("Company", "") if isinstance(x, dict) else str(x), key="edit_comp")
@@ -1315,6 +1329,8 @@ def tab4():
                     "company_name": edited_company.get('Company') if isinstance(edited_company, dict) else edited_company,
                     "vertical_industry": derived_vertical,
                     "distributor_name": final_dist,
+                    "start_date": edited_start_date.strftime("%Y-%m-%d"),
+                    "route_to_market": edited_rtm,
                     "user": current_user_name
                 })
                 res_full = db.update_full_opportunity(payload)

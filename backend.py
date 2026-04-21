@@ -553,6 +553,7 @@ def update_full_opportunity(payload):
                     salesgroup_id=:sg, sales_name=:sn,
                     responsible_name=:pam, pillar=:p, solution=:s, service=:svc,
                     brand=:b, company_name=:cn, vertical_industry=:vi, distributor_name=:dn,
+                    start_date=:sd, route_to_market=:rtm,
                     updated_at=NOW()
                 WHERE uid=:ouid
             """)
@@ -564,6 +565,8 @@ def update_full_opportunity(payload):
                 "s": payload['solution'], "svc": payload['service'],
                 "b": payload['brand'], "cn": payload['company_name'],
                 "vi": payload['vertical_industry'], "dn": payload['distributor_name'],
+                "sd": payload['start_date'], 
+                "rtm": payload['route_to_market'],
                 "ouid": payload['uid']
             })
             
@@ -577,7 +580,9 @@ def update_full_opportunity(payload):
                 'service': 'Service',
                 'brand': 'Brand',
                 'company_name': 'Company',
-                'distributor_name': 'Distributor'
+                'distributor_name': 'Distributor',
+                'start_date': 'Start Date',
+                'route_to_market': 'Route To Market'
             }
             
             for db_field, label in fields_to_track.items():
