@@ -1275,13 +1275,38 @@ def tab4():
         # ---------------------------------------------------------
         with t_cust:
             st.markdown("##### Customer Info & Distributor")
-            current_rtm = lead.get('route_to_market', 'Direct')
-            edited_rtm = st.selectbox(
+            current_rtm_db = lead.get('route_to_market', 'Direct')
+            b2b_list = ["Telkom", "iForte", "Penataran", "Icon+", "IOH", "XL", "Fiberstar", "Lintasarta", "Jasnikom", "PGASCOM", "Biznet", "Others"]
+            
+            # Deteksi status saat ini: Apakah Direct atau B2B?
+            if current_rtm_db == 'Direct' or not current_rtm_db:
+                default_approach_idx = 0 # Index untuk "Direct"
+            else:
+                default_approach_idx = 1 # Index untuk "B2B Channel"
+
+            sales_approach_edit = st.radio(
                 "Route to Market", 
-                options=["Direct", "B2B Channel", "Telkom", "iForte", "Penataran", "Others"], 
-                index=0 if current_rtm == 'Direct' else None, # Logika index disesuaikan
-                key="edit_rtm"
+                ("Direct", "B2B Channel"), 
+                index=default_approach_idx, 
+                horizontal=True, 
+                key="edit_rtm_radio"
             )
+            
+            edited_rtm = "Direct"
+            if sales_approach_edit == "B2B Channel":
+                # Jika database sebelumnya menyimpan nama channel (misal: Telkom), jadikan itu default
+                default_b2b_idx = b2b_list.index(current_rtm_db) if current_rtm_db in b2b_list else 0
+                
+                edited_rtm = st.selectbox(
+                    "Select B2B Channel", 
+                    options=b2b_list, 
+                    index=default_b2b_idx, 
+                    key="edit_rtm_b2b_select"
+                )
+                company_label = "End User"
+            else:
+                edited_rtm = "Direct"
+                company_label = "Company"
             
             edited_company = st.selectbox("Company", all_companies_data, 
                 index=get_index(all_companies_data, lead.get('company_name'), 'Company'), 
