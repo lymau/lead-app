@@ -138,7 +138,7 @@ def main_app():
         if username == 'Krisa Kurniawan':
             st.markdown("---")
             st.markdown("### 🛠️ Admin Tools")
-            if st.button("🚨 Run 1-Month Inactivity Check"):
+            if st.button("🚨 Run 14 days Inactivity Check"):
                 with st.spinner("Checking database & sending email..."):
                     res = db.check_and_remind_inactive_presales()
                     if res['status'] == 200:
