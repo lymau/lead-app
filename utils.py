@@ -403,7 +403,7 @@ def tab1(default_inputter=None):
                     key="parent_b2b_channel"
                 )
                 if b2b_channel_selected == "Others":
-                    other_channel_name = st.text_input("Masukkan Nama B2B Channel (Spesifik)", key="parent_b2b_other_input")
+                    other_channel_name = st.text_input("Input Other B2B Channel (Specific)", key="parent_b2b_other_input")
                     
                     # Gunakan teks yang diketik user. Jika masih kosong, beri fallback "Others"
                     route_string = other_channel_name if other_channel_name else "Others"
