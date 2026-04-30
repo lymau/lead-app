@@ -402,10 +402,18 @@ def tab1(default_inputter=None):
                     ["Telkom", "iForte", "Penataran", "Icon+", "IOH", "XL", "Fiberstar", "Lintasarta", "Jasnikom", "PGASCOM", "Biznet", "Others"],
                     key="parent_b2b_channel"
                 )
+                if b2b_channel_selected == "Others":
+                    other_channel_name = st.text_input("Masukkan Nama B2B Channel (Spesifik)", key="parent_b2b_other_input")
+                    
+                    # Gunakan teks yang diketik user. Jika masih kosong, beri fallback "Others"
+                    route_string = other_channel_name if other_channel_name else "Others"
+                    final_route = route_string
+                else:
+                    route_string = b2b_channel_selected
+                    final_route = b2b_channel_selected # Set variabel final
+                
                 company_label = "End User"
                 is_listed_label = "Is the End User listed?"
-                route_string = b2b_channel_selected
-                final_route = b2b_channel_selected # Set variabel final
             else:
                 company_label = "Company"
                 is_listed_label = "Is the company listed?"
