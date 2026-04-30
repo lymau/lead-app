@@ -1292,6 +1292,9 @@ def tab4():
             else:
                 default_approach_idx = 1 # Index untuk "B2B Channel"
 
+            # ==========================================================
+            # 1. ROUTE TO MARKET LOGIC
+            # ==========================================================
             sales_approach_edit = st.radio(
                 "Route to Market", 
                 ("Direct", "B2B Channel"), 
@@ -1300,28 +1303,86 @@ def tab4():
                 key="edit_rtm_radio"
             )
             
-            edited_rtm = "Direct"
             if sales_approach_edit == "B2B Channel":
-                # Jika database sebelumnya menyimpan nama channel (misal: Telkom), jadikan itu default
-                default_b2b_idx = b2b_list.index(current_rtm_db) if current_rtm_db in b2b_list else 0
+                # Jika database sebelumnya BUKAN dari daftar b2b_list, berarti dulu dia "Others"
+                if current_rtm_db in b2b_list:
+                    default_b2b_idx = b2b_list.index(current_rtm_db)
+                else:
+                    default_b2b_idx = b2b_list.index("Others") if "Others" in b2b_list else 0
                 
-                edited_rtm = st.selectbox(
+                b2b_channel_selected = st.selectbox(
                     "Select B2B Channel", 
                     options=b2b_list, 
                     index=default_b2b_idx, 
                     key="edit_rtm_b2b_select"
                 )
+                
+                # --- LOGIKA MUNCULNYA TEXT INPUT JIKA MEMILIH OTHERS ---
+                if b2b_channel_selected == "Others":
+                    default_other_val = current_rtm_db if current_rtm_db not in b2b_list and current_rtm_db != "Direct" else ""
+                    other_channel_name = st.text_input(
+                        "Masukkan Nama B2B Channel (Spesifik)", 
+                        value=default_other_val, 
+                        key="edit_b2b_other_input"
+                    )
+                    edited_rtm = other_channel_name if other_channel_name else "Others"
+                else:
+                    edited_rtm = b2b_channel_selected
+                
+                # Definisi Label untuk B2B
                 company_label = "End User"
+                is_listed_label = "Is the End User listed?"
+                
             else:
                 edited_rtm = "Direct"
+                
+                # Definisi Label untuk Direct
                 company_label = "Company"
-            
-            edited_company = st.selectbox("Company", all_companies_data, 
-                index=get_index(all_companies_data, lead.get('company_name'), 'Company'), 
-                format_func=lambda x: x.get("Company", "") if isinstance(x, dict) else str(x), key="edit_comp")
-            
-            derived_vertical = edited_company.get('Vertical Industry', '') if isinstance(edited_company, dict) else lead.get('vertical_industry', '')
-            st.text_input("Vertical Industry (Auto)", value=derived_vertical, disabled=True, key="edit_vert")
+                is_listed_label = "Is the company listed?"
+
+            # ==========================================================
+            # 2. COMPANY / END USER LOGIC
+            # ==========================================================
+            is_listed = st.radio(
+                is_listed_label,  # Variabel ini sekarang dijamin aman
+                ("Yes", "No"), 
+                horizontal=True, 
+                key="edit_is_listed"
+            )
+
+            final_company_str = ""
+            derived_vertical = ""
+
+            if is_listed == "Yes":
+                edited_company = st.selectbox(
+                    company_label, 
+                    all_companies_data, 
+                    index=get_index(all_companies_data, lead.get('company_name'), 'Company'), 
+                    format_func=lambda x: x.get("Company", "") if isinstance(x, dict) else str(x), 
+                    key="edit_comp"
+                )
+                final_company_str = edited_company.get('Company') if isinstance(edited_company, dict) else str(edited_company)
+                derived_vertical = edited_company.get('Vertical Industry', '') if isinstance(edited_company, dict) else lead.get('vertical_industry', '')
+                
+                st.text_input("Vertical Industry (Auto)", value=derived_vertical, disabled=True, key="edit_vert_auto")
+            else:
+                new_company_name = st.text_input(f"New {company_label} Name", key="edit_new_comp_name")
+                vertical_list = [
+                    "Telecommunications", 
+                    "Financial Services Industry (FSI)", 
+                    "Government & Public Sector", 
+                    "Education", 
+                    "Manufacture", 
+                    "Energy & Utilities",
+                    "Hospitality",
+                    "Transportation & Logistics",
+                    "Others"
+                ]
+                
+                new_vertical = st.selectbox("Vertical Industry", options=vertical_list, key="edit_new_vert")
+                
+                final_company_str = new_company_name
+                derived_vertical = new_vertical
 
             current_dist = lead.get('distributor_name', 'Not via distributor')
             is_via_default = 0 if current_dist != "Not via distributor" and current_dist else 1
@@ -1338,6 +1399,8 @@ def tab4():
         st.markdown("---")
         if st.button("💾 Save All Changes", type="primary", use_container_width=True):
             with st.spinner("Saving changes to database..."):
+                if is_listed == "No" and final_company_str.strip() != "":
+                    db.add_master_company(final_company_str, derived_vertical)
                 # 1. Update Cost & Notes (Ex-Tab 4 logic)
                 res_cost = db.update_lead({
                     "uid": lead['uid'], 
@@ -1359,7 +1422,7 @@ def tab4():
                     "solution": edited_solution,
                     "service": edited_service,
                     "brand": final_brand_str,
-                    "company_name": edited_company.get('Company') if isinstance(edited_company, dict) else edited_company,
+                    "company_name": final_company_str,
                     "vertical_industry": derived_vertical,
                     "distributor_name": final_dist,
                     "start_date": edited_start_date.strftime("%Y-%m-%d"),
