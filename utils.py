@@ -619,8 +619,32 @@ def tab1(default_inputter=None):
     st.subheader("Step 3: Submit Opportunity")
 
     presales_data = get_master('getPresales') 
+    
+    # 1. Ambil nama-nama presales dan urutkan sesuai abjad
+    presales_names = sorted([p['PresalesName'] for p in presales_data if p.get('Email')])
     email_map = {p['PresalesName']: p['Email'] for p in presales_data if p.get('Email')}
-    recipient_options = sorted(list(email_map.keys()))
+    
+    # =================================================================
+    # --- TAMBAHAN GROUP EMAIL (FRONTEND INJECTION) ---
+    # =================================================================
+    group_emails = {
+        "👥 [Group] Tim ENT1": "se.ent1@sisindokom.com",
+        "👥 [Group] Tim ENT2": "se.ent2@sisindokom.com",
+        "👥 [Group] Tim Data Center": "se.dc@sisindokom.com",
+        "👥 [Group] Tim Security": "se.security@sisindokom.com",
+        "👥 [Group] Tim IOH XL": "se.iohxl@sisindokom.com",
+        "👥 [Group] Tim 2-Tier SP": "se.2tiersp@sisindokom.com",
+        "👥 [Group] Tim Maintenance": "se.maintenance@sisindokom.com"
+    }
+    email_map.update(group_emails)
+    
+    # 2. Ekstrak nama-nama grup (sesuai urutan di dalam dictionary di atas)
+    group_names = list(group_emails.keys())
+    # =================================================================
+
+    # 3. Gabungkan list dengan urutan: [Group Emails] DULUAN, baru [Presales Names]
+    recipient_options = group_names + presales_names
+    
     default_recipients = [current_user_name] if current_user_name in recipient_options else []
 
     selected_recipient_names = st.multiselect(
