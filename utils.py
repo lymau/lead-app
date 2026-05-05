@@ -804,10 +804,27 @@ def tab2():
             header = detail_df.iloc[0]
             st.header(f"{header['opportunity_name']} ({header['company_name']})")
             
-            # --- FIX: Tampilkan Grand Total di Detail View ---
+            # --- Tampilkan Grand Total ---
             total_kalkulasi = pd.to_numeric(detail_df['cost'], errors='coerce').fillna(0).sum()
-            st.info(f"**💰 Grand Total Cost:** Rp {format_number(total_kalkulasi)}")
-            # -------------------------------------------------
+            
+            # --- FITUR BARU: Menampilkan Link OneDrive Jika Ada ---
+            # Asumsi kolom po_boq_link sudah ditarik di dataframe dari query SELECT *
+            po_link = header.get('po_boq_link', None)
+            
+            col_tot, col_link = st.columns([0.7, 0.3])
+            
+            with col_tot:
+                st.info(f"**💰 Grand Total Cost:** Rp {format_number(total_kalkulasi)}")
+                
+            with col_link:
+                # Tampilkan tombol/link hanya jika Stage = Closed Won dan po_link ada isinya
+                if header.get('stage') == 'Closed Won':
+                    if pd.notna(po_link) and po_link != "":
+                        # Menggunakan st.link_button untuk tampilan tombol yang rapi
+                        st.link_button("📁 Download / View Final BOQ", url=po_link, use_container_width=True)
+                    else:
+                        st.warning("⚠️ File BOQ belum dilampirkan.")
+            # -----------------------------------------------------
             
             st.dataframe(clean_data_for_display(detail_df), use_container_width=True)
         else:
@@ -1555,18 +1572,43 @@ def tab5():
 
             new_stage = st.selectbox("2. Select New Stage", stage_options, index=default_idx)
 
+            # ==========================================================
+            # --- FITUR BARU: CONDITIONAL RENDERING ONEDRIVE LINK ---
+            # ==========================================================
+            onedrive_link = None
+            
+            # Daftar user yang diizinkan untuk melihat dan mengisi kolom link
+            authorized_admin_users = ["Krisa Kurniawan", "Ridha Evitafany"]
+
+            if new_stage == "Closed Won":
+                if current_user in authorized_admin_users:
+                    # Tampilan KHUSUS untuk Krisa & Ridha
+                    st.info("🎉 **Proyek Closed Won!** (Admin Access) Silakan masukkan link OneDrive file PO & BOQ Final jika sudah tersedia.")
+                    onedrive_link = st.text_input("🔗 OneDrive BOQ Link (Opsional)", placeholder="https://sisindokom-my.sharepoint.com/...")
+                else:
+                    # Tampilan untuk Presales lainnya
+                    st.info("🎉 **Proyek Closed Won!** Hubungi tim Admin (Krisa / Ridha) untuk melampirkan file PO & BOQ Final.")
+            # ==========================================================
+
             if st.button("💾 Update Stage", type="primary"):
+                # --- VALIDASI SEBELUM SAVE ---
                 if new_stage == curr_stage:
                     st.warning("⚠️ Stage tidak ada perubahan.")
+                # (Blokir error link kosong telah dihapus di sini)
                 else:
                     with st.spinner("Updating stage to all related products..."):
-                        res = db.update_opportunity_stage(opp_id, new_stage, current_user)
+                        
+                        # Pastikan jika string kosong, kita kirim None agar logic COALESCE di backend aman
+                        final_link = onedrive_link if onedrive_link else None
+                        
+                        # ---> Panggil fungsi backend
+                        res = db.update_opportunity_stage(opp_id, new_stage, current_user, final_link)
                         
                         if res['status'] == 200:
                             st.success(f"✅ {res['message']}")
                             
                             # ==========================================================
-                            # --- LOGIKA BARU: AUTO-NOTIFIKASI STAGE KE CHANNEL PIC ---
+                            # --- LOGIKA: AUTO-NOTIFIKASI STAGE KE CHANNEL PIC ---
                             # ==========================================================
                             try:
                                 # 1. Filter baris data khusus untuk Opportunity yang dipilih

@@ -616,21 +616,11 @@ def update_full_opportunity(payload):
     except Exception as e:
         return {"status": 500, "message": str(e)}
     
-def update_opportunity_stage(opp_id, new_stage, user_actor):
-    """
-    Update Stage ke SEMUA baris (line items) yang memiliki opportunity_id yang sama.
-    Menggunakan conn.session bawaan Streamlit agar transaksi database lebih stabil.
-    """
+def update_opportunity_stage(opp_id, new_stage, user_actor, po_boq_link=None):
     try:
-        # Gunakan session bawaan Streamlit untuk menangani transaksi secara otomatis
         with conn.session as session:
             # 1. Ambil data lama (untuk Log)
-            q_check = text("""
-                SELECT stage, opportunity_name 
-                FROM opportunities 
-                WHERE opportunity_id = :oid 
-                LIMIT 1
-            """)
+            q_check = text("SELECT stage, opportunity_name FROM opportunities WHERE opportunity_id = :oid LIMIT 1")
             old_data = session.execute(q_check, {"oid": opp_id}).mappings().first()
             
             if not old_data:
@@ -639,13 +629,15 @@ def update_opportunity_stage(opp_id, new_stage, user_actor):
             old_stage = old_data['stage']
             opp_name = old_data['opportunity_name']
 
-            # 2. Update Stage ke SEMUA baris dengan opportunity_id tersebut
+            # 2. Update Stage & Link BOQ
             upd_q = text("""
                 UPDATE opportunities 
-                SET stage = :stg, updated_at = NOW() 
+                SET stage = :stg, 
+                    po_boq_link = COALESCE(:link, po_boq_link), -- Simpan link jika ada
+                    updated_at = NOW() 
                 WHERE opportunity_id = :oid
             """)
-            session.execute(upd_q, {"stg": new_stage, "oid": opp_id})
+            session.execute(upd_q, {"stg": new_stage, "oid": opp_id, "link": po_boq_link})
 
             # 3. Catat di Activity Log jika ada perubahan
             if old_stage != new_stage:
