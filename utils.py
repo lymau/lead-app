@@ -1755,3 +1755,75 @@ def tab6():
         st.dataframe(df_log, use_container_width=True, hide_index=True)
     else:
         st.info("No logs found.")
+        
+@st.fragment
+def tab7():
+    st.header("Delete Opportunity")
+    
+    # 1. Cek Session & Akses
+    if 'presales_session' not in st.session_state:
+        st.error("Session expired.")
+        return
+        
+    current_user = st.session_state.presales_session['username']
+    allowed_admins = ["Krisa Kurniawan", "Ridha Evitafany"]
+    
+    if current_user not in allowed_admins:
+        st.error("⛔ Akses Ditolak: Halaman ini khusus untuk Data Admin.")
+        return
+
+    st.info("Fitur ini akan **MENGHAPUS PERMANEN** 1 baris produk/solusi dari database berdasarkan UID. Gunakan dengan sangat hati-hati!")
+    st.markdown("---")
+
+    # 2. Form Input UID
+    uid_to_delete = st.text_input(
+        "Masukkan UID dari baris yang ingin dihapus:", 
+        placeholder="Contoh: 123e4567-e89b-12d3-a456-426614174000",
+        help="Anda bisa mendapatkan (copy) UID dari kolom UID di menu Kanban/View Data.",
+        key="admin_delete_uid" 
+    )
+
+    # 3. ALUR PREVIEW DATA (SELECT * WHERE UID = ...)
+    if uid_to_delete.strip():
+        with st.spinner("Mencari data..."):
+            preview_res = db.get_opportunity_by_uid(uid_to_delete.strip())
+            
+        if preview_res['status'] == 200:
+            data = preview_res['data']
+            
+            st.success("✅ **Data ditemukan!** Silakan periksa rincian di bawah ini sebelum menghapus.")
+            
+            # Menampilkan Preview Card
+            with st.container(border=True):
+                st.markdown(f"### 📄 {data.get('opportunity_name', 'Unknown Project')}")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**🏢 Company:** {data.get('company_name', '-')}")
+                    st.write(f"**👤 Sales:** {data.get('sales_name', '-')} ({data.get('salesgroup_id', '-')})")
+                    st.write(f"**👨‍💻 Presales:** {data.get('presales_name', '-')}")
+                with col2:
+                    st.write(f"**🛠️ Solution:** {data.get('solution', '-')} ({data.get('brand', '-')})")
+                    # Menggunakan formatter angka standar Python agar aman
+                    cost_val = data.get('cost', 0)
+                    st.write(f"**💵 Cost:** Rp {cost_val:,.0f}")
+                    st.write(f"**📊 Stage:** `{data.get('stage', '-')}`")
+
+            st.warning("⚠️ Perhatian: Jika Anda menekan tombol di bawah, data ini akan **dihapus permanen** dari database.")
+
+            # 4. Eksekusi Tombol Delete (Muncul SETELAH data diverifikasi ada)
+            if st.button("🚨 Ya, Hapus Data Ini Sekarang", type="primary"):
+                with st.spinner("Memproses penghapusan data..."):
+                    res = db.delete_opportunity_by_uid(uid_to_delete.strip())
+                    
+                    if res['status'] == 200:
+                        st.toast("Data berhasil dihapus permanen dari database!", icon="🗑️")
+                        st.success(f"✅ {res['message']}")
+                        time.sleep(2.5)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ {res['message']}")
+                        
+        else:
+            # Jika UID diketik namun tidak ada di database
+            st.error("❌ UID tidak ditemukan di database. Pastikan format dan karakter UID yang Anda masukkan (paste) sudah benar.")

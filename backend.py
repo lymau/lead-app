@@ -783,3 +783,46 @@ def send_email_background(target_email, subject, body):
         args=(target_email, subject, body)
     )
     email_thread.start() # Jalankan dan langsung lupakan (Fire and Forget)
+    
+def get_opportunity_by_uid(uid):
+    """
+    Mengambil 1 baris spesifik dari tabel opportunities berdasarkan UID untuk keperluan preview.
+    """
+    try:
+        with conn.session as session:
+            q = text("SELECT * FROM opportunities WHERE uid = :uid LIMIT 1")
+            result = session.execute(q, {"uid": uid}).mappings().first()
+            
+            if result:
+                # Ubah format hasil query menjadi dictionary agar mudah dibaca frontend
+                return {"status": 200, "data": dict(result)}
+            else:
+                return {"status": 404, "message": "UID tidak ditemukan."}
+                
+    except Exception as e:
+        return {"status": 500, "message": f"Database error: {e}"}
+    
+def delete_opportunity_by_uid(uid):
+    """
+    Menghapus 1 baris spesifik di tabel opportunities berdasarkan UID.
+    """
+    try:
+        with conn.session as session:
+            # 1. Cek apakah data dengan UID tersebut ada (untuk pesan log/notifikasi)
+            check_q = text("SELECT opportunity_name, solution, brand FROM opportunities WHERE uid = :uid LIMIT 1")
+            row = session.execute(check_q, {"uid": uid}).mappings().first()
+            
+            if not row:
+                return {"status": 404, "message": "Data dengan UID tersebut tidak ditemukan di database."}
+            
+            # 2. Eksekusi proses penghapusan
+            del_q = text("DELETE FROM opportunities WHERE uid = :uid")
+            session.execute(del_q, {"uid": uid})
+            session.commit()
+            
+            # Kembalikan pesan sukses yang detail
+            msg = f"Berhasil menghapus item '{row['solution']}' ({row['brand']}) dari proyek '{row['opportunity_name']}'."
+            return {"status": 200, "message": msg}
+            
+    except Exception as e:
+        return {"status": 500, "message": f"Database Error: {e}"}

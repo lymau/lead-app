@@ -153,30 +153,39 @@ def main_app():
         st.markdown("---")
         
 
-    # --- Tabs Navigation ---
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "Add Opportunity", "View Opportunities", "Search Opportunity", 
-        "Edit and Update Opportunity", "Update Stage", "Activity Log"
-    ])
+    # --- Tabs Navigation (Dynamic Rendering) ---
+    allowed_admins = ["Krisa Kurniawan", "Ridha Evitafany"]
+    is_admin = username in allowed_admins
 
-    # Memanggil Utils untuk konten setiap tab
-    with tab1:
-        utils.tab1(default_inputter=username) 
-
-    with tab2:
-        utils.tab2()
-
-    with tab3:
-        utils.tab3()
-
-    with tab4:
-        utils.tab4()
-
-    with tab5:
-        utils.tab5()
+    # 1. Definisikan nama-nama Tab standar (Hanya 6 Tab)
+    tab_names = [
+        "Add Opportunity", 
+        "View Opportunities", 
+        "Search Opportunity", 
+        "Edit and Update Opportunity", 
+        "Update Stage", 
+        "Activity Log"
+    ]
+    
+    # 2. Sisipkan Tab khusus Admin HANYA JIKA user punya akses
+    if is_admin:
+        tab_names.append("🗑️ Delete Opportunity")  # Menjadi Tab ke-7
         
-    with tab6:
-        utils.tab6()
+    # 3. Render Tabs ke dalam sebuah list
+    tabs = st.tabs(tab_names)
+    
+    # 4. Panggil isi dari masing-masing Tab menggunakan indeks
+    with tabs[0]: utils.tab1(default_inputter=username)
+    with tabs[1]: utils.tab2()
+    with tabs[2]: utils.tab3()
+    with tabs[3]: utils.tab4()
+    with tabs[4]: utils.tab5()
+    with tabs[5]: utils.tab6()
+    
+    # 5. Panggil tab ke-7 (indeks 6) HANYA untuk Admin
+    if is_admin:
+        with tabs[6]: 
+            utils.tab7()
 
 # ==============================================================================
 # 5. ROUTER UTAMA (LOGIC PERBAIKAN)
