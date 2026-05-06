@@ -802,26 +802,41 @@ def get_opportunity_by_uid(uid):
     except Exception as e:
         return {"status": 500, "message": f"Database error: {e}"}
     
-def delete_opportunity_by_uid(uid):
+def delete_opportunity_by_uid(uid, user_actor):
     """
-    Menghapus 1 baris spesifik di tabel opportunities berdasarkan UID.
+    Menghapus 1 baris spesifik di tabel opportunities dan mencatatnya di Activity Log.
     """
     try:
         with conn.session as session:
-            # 1. Cek apakah data dengan UID tersebut ada (untuk pesan log/notifikasi)
+            # 1. Cek data untuk mendapatkan detail sebelum dihapus
             check_q = text("SELECT opportunity_name, solution, brand FROM opportunities WHERE uid = :uid LIMIT 1")
             row = session.execute(check_q, {"uid": uid}).mappings().first()
             
             if not row:
                 return {"status": 404, "message": "Data dengan UID tersebut tidak ditemukan di database."}
             
+            opp_name = row['opportunity_name']
+            item_detail = f"{row['solution']} ({row['brand']})"
+            
             # 2. Eksekusi proses penghapusan
             del_q = text("DELETE FROM opportunities WHERE uid = :uid")
             session.execute(del_q, {"uid": uid})
+            
+            # 3. Merekam Jejak ke Activity Log
+            # Sesuaikan nama tabel 'activity_logs' dengan nama tabel log Anda di database
+            log_q = text("""
+                INSERT INTO activity_logs (timestamp, opportunity_name, user_name, action, field, old_value, new_value)
+                VALUES (NOW(), :opp, :usr, 'DELETE', 'Opportunity Item', :old_val, 'DELETED')
+            """)
+            session.execute(log_q, {
+                "opp": opp_name,
+                "usr": user_actor,
+                "old_val": item_detail
+            })
+            
             session.commit()
             
-            # Kembalikan pesan sukses yang detail
-            msg = f"Berhasil menghapus item '{row['solution']}' ({row['brand']}) dari proyek '{row['opportunity_name']}'."
+            msg = f"Berhasil menghapus item '{item_detail}' dari proyek '{opp_name}'."
             return {"status": 200, "message": msg}
             
     except Exception as e:

@@ -1814,7 +1814,7 @@ def tab7():
             # 4. Eksekusi Tombol Delete (Muncul SETELAH data diverifikasi ada)
             if st.button("🚨 Ya, Hapus Data Ini Sekarang", type="primary"):
                 with st.spinner("Memproses penghapusan data..."):
-                    res = db.delete_opportunity_by_uid(uid_to_delete.strip())
+                    res = db.delete_opportunity_by_uid(uid_to_delete.strip(), current_user)
                     
                     if res['status'] == 200:
                         st.toast("Data berhasil dihapus permanen dari database!", icon="🗑️")
