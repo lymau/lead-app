@@ -169,7 +169,7 @@ def main_app():
     
     # 2. Sisipkan Tab khusus Admin HANYA JIKA user punya akses
     if is_admin:
-        tab_names.append("🗑️ Delete Opportunity")  # Menjadi Tab ke-7
+        tab_names.append("Delete Opportunity")  # Menjadi Tab ke-7
         
     # 3. Render Tabs ke dalam sebuah list
     tabs = st.tabs(tab_names)
