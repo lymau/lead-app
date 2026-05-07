@@ -1333,7 +1333,7 @@ def tab4():
         with t_cust:
             st.markdown("##### Customer Info & Distributor")
             current_rtm_db = lead.get('route_to_market', 'Direct')
-            b2b_list = ["Telkom", "iForte", "Penataran", "Icon+", "IOH", "XL", "Fiberstar", "Lintasarta", "Jasnikom", "PGASCOM", "Biznet", "Others"]
+            b2b_list = ["Telkom", "Telkomsel", "iForte", "Penataran", "Icon+", "IOH", "XL", "Fiberstar", "Lintasarta", "Jasnikom", "PGASCOM", "Biznet", "Others"]
             
             # Deteksi status saat ini: Apakah Direct atau B2B?
             if current_rtm_db == 'Direct' or not current_rtm_db:
