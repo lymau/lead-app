@@ -322,7 +322,7 @@ def tab1(default_inputter=None):
         
         
         if current_access_group == 'ENT_1':
-            final_sg_options = [sg for sg in all_sg_options if sg in ['ENT1', 'SP1B']]
+            final_sg_options = [sg for sg in all_sg_options if sg in ['ENT1', 'SP1B', 'SP1A']]
             if not final_sg_options: final_sg_options = all_sg_options
         elif current_access_group == '2ND_TIER':
             final_sg_options = ['SP2B']

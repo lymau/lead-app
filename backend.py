@@ -203,7 +203,6 @@ def get_leads_by_group_logic(username):
                 final_query = text(f"{base_query} AND (salesgroup_id IN ('NET_SPEC', 'IOH_XL', '2ND_TIER') OR presales_name IN (SELECT presales_name FROM presales WHERE access_group IN ('NET_SPEC', 'IOH_XL', '2ND_TIER')))")
             elif access_group == 'ENT_1':
                 final_query = text(f"{base_query} AND salesgroup_id IN ('ENT1', 'SP1B')")
-                
             elif access_group == 'ENT_2':
                 final_query = text(f"{base_query} AND salesgroup_id = 'ENT2'")
                 
