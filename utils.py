@@ -953,7 +953,7 @@ def tab3():
             fillna_cols = [
                 'presales_name', 'responsible_name', 'channel', 'brand', 'stage', 
                 'salesgroup_id', 'pillar', 'solution', 'company_name', 
-                'vertical_industry', 'opportunity_name', 'distributor_name', 'sales_name'
+                'vertical_industry', 'opportunity_name', 'distributor_name', 'sales_name', 'route_to_market'
             ]
             for col in fillna_cols:
                 if col in df.columns:
@@ -981,7 +981,7 @@ def tab3():
                     def reset_filters():
                         multiselect_keys = [
                             'f_inputter', 'f_pam', 'f_group', 'f_sales', 'f_channel', 'f_dist',
-                            'f_brand', 'f_pillar', 'f_sol', 'f_client', 'f_vert', 'f_stage', 'f_opp'
+                            'f_brand', 'f_pillar', 'f_sol', 'f_client', 'f_vert', 'f_stage', 'f_opp', 'f_route'
                         ]
                         
                         # Timpa value dengan array kosong (ini memaksa UI di browser untuk bersih)
@@ -1013,7 +1013,7 @@ def tab3():
                 with c11: sel_vertical = st.multiselect("Vertical", get_opts('vertical_industry'), placeholder="All Verticals", key="f_vert")
 
                 # --- Baris 3: Stage, Date, Opportunity Name ---
-                c12, c13, c14 = st.columns([1, 2, 3])
+                c12, c13, c14, c15 = st.columns([1, 2, 3, 1])
                 with c12: 
                     sel_stage = st.multiselect("Stage", get_opts('stage'), placeholder="All Stages", key="f_stage")
                 
@@ -1036,6 +1036,13 @@ def tab3():
                         placeholder="Select Opportunity Name...",
                         key="f_opp"
                     )
+                
+                with c15:
+                    # Search berdasarkan route_to_market (Direct vs B2B Channel)
+                    route_options = sorted(df['route_to_market'].unique()) if 'route_to_market' in df.columns else []
+                    sel_route = st.multiselect("Route to Market", route_options, placeholder="All Routes", key="f_route")
+                    
+                    
                     
             # =================================================================
             # 🔄 LOGIKA FILTERING (ENGINE)
@@ -1054,6 +1061,7 @@ def tab3():
             if sel_client: df_filtered = df_filtered[df_filtered['company_name'].isin(sel_client)]
             if sel_vertical: df_filtered = df_filtered[df_filtered['vertical_industry'].isin(sel_vertical)]
             if sel_stage: df_filtered = df_filtered[df_filtered['stage'].isin(sel_stage)]
+            if sel_route: df_filtered = df_filtered[df_filtered['route_to_market'].isin(sel_route)]
             
             if sel_opportunity:
                 df_filtered = df_filtered[df_filtered['opportunity_name'].isin(sel_opportunity)]
