@@ -379,15 +379,33 @@ def tab1(default_inputter=None):
                 try:
                     # Membedah string misal: "[Telkom] AAF International - Project - April 2026"
                     parsed_route = opportunity_name_final.split(']')[0].replace('[', '').strip()
-                    parsed_company = opportunity_name_final.split(']')[1].split('-')[0].strip()
+                    parsed_company = opportunity_name_final.split(']')[1].split(' - ')[0].strip()
                     
                     final_route = parsed_route
                     company_name_final = parsed_company
                     vertical_industry_final = "Auto-Synced with Parent" 
                     
                     st.success(f"🔗 **Auto-Synced with Parent Data:**\n* Route: **{final_route}**\n* Company: **{company_name_final}**")
-                except:
-                    st.warning("⚠️ Format opportunity lama tidak standar. Harap hubungi Admin.")
+                
+                except IndexError:
+                    # ==========================================================
+                    # BYPASS MODE: Jika format tidak standar (hilang kurung/strip)
+                    # ==========================================================
+                    final_route = "Unknown Route (Legacy Data)"
+                    company_name_final = "Unknown Company (Legacy Data)"
+                    vertical_industry_final = "Auto-Synced with Parent" 
+                    
+                    st.info("ℹ️ **Bypass Mode Aktif:** Format opportunity lama tidak standar, namun Anda tetap diizinkan untuk melanjutkan (Submit).")
+                    
+                except Exception as e:
+                    # ==========================================================
+                    # BYPASS MODE: Untuk segala jenis error parsing lainnya
+                    # ==========================================================
+                    final_route = "Error Parsing Route"
+                    company_name_final = "Error Parsing Company"
+                    vertical_industry_final = "Auto-Synced with Parent" 
+                    
+                    st.warning(f"⚠️ Gagal membaca format teks, namun Anda tetap bisa melanjutkan (Bypass Aktif). Detail error: {e}")
 
         else:
             # ==========================================
