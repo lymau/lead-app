@@ -615,7 +615,7 @@ def update_full_opportunity(payload):
     except Exception as e:
         return {"status": 500, "message": str(e)}
     
-def update_opportunity_stage(opp_id, new_stage, user_actor, po_boq_link=None):
+def update_opportunity_stage(opp_id, new_stage, user_actor, po_boq_link=None, project_id=None): # <-- 1. Tambah parameter project_id
     try:
         with conn.session as session:
             # 1. Ambil data lama (untuk Log)
@@ -628,15 +628,23 @@ def update_opportunity_stage(opp_id, new_stage, user_actor, po_boq_link=None):
             old_stage = old_data['stage']
             opp_name = old_data['opportunity_name']
 
-            # 2. Update Stage & Link BOQ
+            # 2. Update Stage, Link BOQ, & Project ID
             upd_q = text("""
                 UPDATE opportunities 
                 SET stage = :stg, 
                     po_boq_link = COALESCE(:link, po_boq_link), -- Simpan link jika ada
+                    project_id = COALESCE(:pid, project_id),    -- <-- 2. Simpan PID jika ada
                     updated_at = NOW() 
                 WHERE opportunity_id = :oid
             """)
-            session.execute(upd_q, {"stg": new_stage, "oid": opp_id, "link": po_boq_link})
+            
+            # <-- 3. Tambahkan "pid" ke dalam parameter eksekusi
+            session.execute(upd_q, {
+                "stg": new_stage, 
+                "oid": opp_id, 
+                "link": po_boq_link, 
+                "pid": project_id 
+            })
 
             # 3. Catat di Activity Log jika ada perubahan
             if old_stage != new_stage:

@@ -115,7 +115,7 @@ def clean_data_for_display(data):
         df = pd.DataFrame(data)
 
     desired_order = [
-        'uid', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'route_to_market','company_name', 
+        'uid', 'opportunity_id', 'project_id', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'route_to_market','company_name', 
         'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 
         'channel', 'distributor_name', 'cost', 'stage', 'notes', 'sales_notes', 'pillar_product', 'solution_product', 'created_at', 'updated_at'
     ]
@@ -1626,33 +1626,36 @@ def tab5():
             # --- FITUR BARU: CONDITIONAL RENDERING ONEDRIVE LINK ---
             # ==========================================================
             onedrive_link = None
+            project_id = None # Inisialisasi variabel baru
             
-            # Daftar user yang diizinkan untuk melihat dan mengisi kolom link
             authorized_admin_users = ["Krisa Kurniawan", "Ridha Evitafany"]
 
             if new_stage == "Closed Won":
                 if current_user in authorized_admin_users:
                     # Tampilan KHUSUS untuk Krisa & Ridha
-                    st.info("🎉 **Proyek Closed Won!** (Admin Access) Silakan masukkan link OneDrive file PO & BOQ Final jika sudah tersedia.")
-                    onedrive_link = st.text_input("🔗 OneDrive BOQ Link (Opsional)", placeholder="https://sisindokom-my.sharepoint.com/...")
+                    st.info("🎉 **Proyek Closed Won!** (Admin Access) Silakan lengkapi data finalisasi proyek di bawah ini.")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        project_id = st.text_input("📁 Project ID (PID)", placeholder="Contoh: PID-2026-001")
+                    with col2:
+                        onedrive_link = st.text_input("🔗 OneDrive BOQ Link", placeholder="https://sisindokom-my.sharepoint.com/...")
                 else:
                     # Tampilan untuk Presales lainnya
-                    st.info("🎉 **Proyek Closed Won!** Hubungi tim Admin (Krisa / Ridha) untuk melampirkan file PO & BOQ Final.")
+                    st.info("🎉 **Proyek Closed Won!** Hubungi tim Admin (Krisa / Ridha) untuk menerbitkan Project ID (PID) dan melampirkan BOQ.")
             # ==========================================================
 
             if st.button("💾 Update Stage", type="primary"):
                 # --- VALIDASI SEBELUM SAVE ---
                 if new_stage == curr_stage:
                     st.warning("⚠️ Stage tidak ada perubahan.")
-                # (Blokir error link kosong telah dihapus di sini)
                 else:
                     with st.spinner("Updating stage to all related products..."):
-                        
-                        # Pastikan jika string kosong, kita kirim None agar logic COALESCE di backend aman
                         final_link = onedrive_link if onedrive_link else None
+                        final_pid = project_id if project_id else None # Tangkap input PID
                         
-                        # ---> Panggil fungsi backend
-                        res = db.update_opportunity_stage(opp_id, new_stage, current_user, final_link)
+                        # ---> Panggil fungsi backend (Tambahkan argumen final_pid)
+                        res = db.update_opportunity_stage(opp_id, new_stage, current_user, final_link, final_pid)
                         
                         if res['status'] == 200:
                             st.success(f"✅ {res['message']}")
