@@ -1708,96 +1708,105 @@ def tab5():
 
             if st.button("💾 Update Stage", type="primary"):
                 # --- VALIDASI SEBELUM SAVE ---
-                if new_stage == curr_stage:
+                # IZINKAN BYPASS JIKA STAGE ADALAH CLOSED WON (Untuk update PID/Link)
+                if new_stage == curr_stage and new_stage != "Closed Won":
                     st.warning("⚠️ Stage tidak ada perubahan.")
                 else:
-                    with st.spinner("Updating stage to all related products..."):
-                        final_link = onedrive_link if onedrive_link else None
-                        final_pid = project_id if project_id else None # Tangkap input PID
+                    with st.spinner("Updating data to database..."):
                         
-                        # ---> Panggil fungsi backend (Tambahkan argumen final_pid)
+                        # Pastikan jika string kosong, kita kirim None
+                        final_link = onedrive_link if onedrive_link else None
+                        final_pid = project_id if project_id else None
+                        
+                        # ---> Panggil fungsi backend
                         res = db.update_opportunity_stage(opp_id, new_stage, current_user, final_link, final_pid)
                         
                         if res['status'] == 200:
-                            st.success(f"✅ {res['message']}")
+                            # 1. Tampilkan Pesan Sukses yang Sesuai
+                            if new_stage == curr_stage:
+                                st.success("✅ Data Project ID (PID) / OneDrive Link berhasil diperbarui!")
+                            else:
+                                st.success(f"✅ {res['message']}")
                             
                             # ==========================================================
                             # --- LOGIKA: AUTO-NOTIFIKASI STAGE KE CHANNEL PIC ---
+                            # HANYA DIKIRIM JIKA STAGE BENAR-BENAR BERUBAH!
                             # ==========================================================
-                            try:
-                                # 1. Filter baris data khusus untuk Opportunity yang dipilih
-                                opp_lines = df[df['opportunity_name'] == sel_opp_name]
-                                involved_brands = opp_lines['brand'].dropna().unique().tolist()
-                                
-                                # Ambil detail header (dari baris pertama) untuk isi email
-                                first_row = opp_lines.iloc[0]
-                                customer_name = first_row.get('company_name', 'Unknown')
-                                sales_name = first_row.get('sales_name', 'Unknown')
-                                sales_group = first_row.get('salesgroup_id', 'Unknown')
-
-                                # 2. Load Master Data
-                                all_brands = get_master('getBrands')
-                                presales_data = get_master('getPresales')
-                                email_map = {p['PresalesName']: p['Email'] for p in presales_data if p.get('Email')}
-
-                                # 3. Kumpulkan email PIC terkait
-                                target_emails = set()
-                                for brand in involved_brands:
-                                    for b in all_brands:
-                                        b_name = b.get('Brand') or b.get('brand_name')
-                                        if b_name == brand:
-                                            pic_name = b.get('Channel') or b.get('channel')
-                                            if pic_name and pic_name in email_map:
-                                                target_emails.add(email_map[pic_name])
-                                            break
-                                
-                                # 4. Jika ada PIC, kirim blast email
-                                if target_emails:
-                                    target_email_string = ", ".join(target_emails)
+                            if new_stage != curr_stage:
+                                try:
+                                    # 1. Filter baris data khusus untuk Opportunity yang dipilih
+                                    opp_lines = df[df['opportunity_name'] == sel_opp_name]
+                                    involved_brands = opp_lines['brand'].dropna().unique().tolist()
                                     
-                                    # Rangkai daftar solusi untuk di badan email
-                                    sol_html = "<ul>"
-                                    for _, row in opp_lines.iterrows():
-                                        sol = row.get('solution', 'No Solution')
-                                        brnd = row.get('brand', 'No Brand')
-                                        cst = row.get('cost', 0)
-                                        sol_html += f"<li><b>{sol}</b> ({brnd}) - Rp {format_number(cst)}</li>"
-                                    sol_html += "</ul>"
-                                    
-                                    # Warna teks dinamis tergantung status
-                                    color = "green" if new_stage == "Closed Won" else "red" if new_stage == "Closed Lost" else "blue"
+                                    # Ambil detail header (dari baris pertama) untuk isi email
+                                    first_row = opp_lines.iloc[0]
+                                    customer_name = first_row.get('company_name', 'Unknown')
+                                    sales_name = first_row.get('sales_name', 'Unknown')
+                                    sales_group = first_row.get('salesgroup_id', 'Unknown')
 
-                                    email_body = f"""
-                                    <h3>📢 Opportunity Stage Updated</h3>
-                                    <p>Status Opportunity berikut telah diubah menjadi <b><span style='color: {color};'>{new_stage}</span></b>.</p>
-                                    <p>
-                                        <b>Opportunity:</b> {sel_opp_name}<br>
-                                        <b>Customer:</b> {customer_name}<br>
-                                        <b>Sales:</b> {sales_name} ({sales_group})<br>
-                                        <b>Updated By:</b> {current_user}
-                                    </p>
-                                    <hr>
-                                    <p><b>Solution Details:</b></p>
-                                    {sol_html}
-                                    <p style='font-size: 10px; color: grey;'>Generated by Presales App - Update Stage Module</p>
-                                    """
+                                    # 2. Load Master Data
+                                    all_brands = get_master('getBrands')
+                                    presales_data = get_master('getPresales')
+                                    email_map = {p['PresalesName']: p['Email'] for p in presales_data if p.get('Email')}
+
+                                    # 3. Kumpulkan email PIC terkait
+                                    target_emails = set()
+                                    for brand in involved_brands:
+                                        for b in all_brands:
+                                            b_name = b.get('Brand') or b.get('brand_name')
+                                            if b_name == brand:
+                                                pic_name = b.get('Channel') or b.get('channel')
+                                                if pic_name and pic_name in email_map:
+                                                    target_emails.add(email_map[pic_name])
+                                                break
                                     
-                                    db.send_email_background(
-                                        target_email_string, 
-                                        f"[{new_stage}] {sel_opp_name}", 
-                                        email_body
-                                    )
-                                    st.toast(f"📧 Stage update notification sent to Channel PICs!", icon="✅")
-                            except Exception as e:
-                                st.toast(f"⚠️ Stage updated but email notification failed: {e}", icon="⚠️")
+                                    # 4. Jika ada PIC, kirim blast email
+                                    if target_emails:
+                                        target_email_string = ", ".join(target_emails)
+                                        
+                                        # Rangkai daftar solusi untuk di badan email
+                                        sol_html = "<ul>"
+                                        for _, row in opp_lines.iterrows():
+                                            sol = row.get('solution', 'No Solution')
+                                            brnd = row.get('brand', 'No Brand')
+                                            cst = row.get('cost', 0)
+                                            # Format angka dengan aman
+                                            cst_val = float(cst) if pd.notnull(cst) and str(cst).replace('.','',1).isdigit() else 0
+                                            sol_html += f"<li><b>{sol}</b> ({brnd}) - Rp {cst_val:,.0f}</li>"
+                                        sol_html += "</ul>"
+                                        
+                                        # Warna teks dinamis tergantung status
+                                        color = "green" if new_stage == "Closed Won" else "red" if new_stage == "Closed Lost" else "blue"
+
+                                        email_body = f"""
+                                        <h3>📢 Opportunity Stage Updated</h3>
+                                        <p>Status Opportunity berikut telah diubah menjadi <b><span style='color: {color};'>{new_stage}</span></b>.</p>
+                                        <p>
+                                            <b>Opportunity:</b> {sel_opp_name}<br>
+                                            <b>Customer:</b> {customer_name}<br>
+                                            <b>Sales:</b> {sales_name} ({sales_group})<br>
+                                            <b>Updated By:</b> {current_user}
+                                        </p>
+                                        <hr>
+                                        <p><b>Solution Details:</b></p>
+                                        {sol_html}
+                                        <p style='font-size: 10px; color: grey;'>Generated by Presales App - Update Stage Module</p>
+                                        """
+                                        
+                                        db.send_email_background(
+                                            target_email_string, 
+                                            f"[{new_stage}] {sel_opp_name}", 
+                                            email_body
+                                        )
+                                        st.toast(f"📧 Stage update notification sent to Channel PICs!", icon="✅")
+                                except Exception as e:
+                                    st.toast(f"⚠️ Stage updated but email notification failed: {e}", icon="⚠️")
                             # ==========================================================
 
                             time.sleep(1.5)
                             st.rerun()
                         else:
                             st.error(f"Failed: {res['message']}")
-    else:
-        st.warning("No opportunities found for your group.")
 
 @st.fragment
 def tab6():
