@@ -1169,6 +1169,37 @@ def tab4():
     if 'lead_to_edit' not in st.session_state: st.session_state.lead_to_edit = None
     if 'edit_submission_message' not in st.session_state: st.session_state.edit_submission_message = None
     if 'edit_new_uid' not in st.session_state: st.session_state.edit_new_uid = None
+    
+    # --- TAMBAHKAN MAPPING INI ---
+    MAINTENANCE_MAPPING = {
+        "Network": [
+            "SP Routing", "Optics", "WLAN and Campus LAN", "SD-WAN", 
+            "Automation, Assurance & Orchestration", "xPON", "Radio Microwave", 
+            "VSAT", "CGNAT", "DPI", "DDI", "Network Monitoring System", 
+            "Training", "Local Material", "Others (Non Sub-Pillar)"
+        ],
+        "Data Center & Cloud Infrastructure": [
+            "Compute", "Data Center Network Fabric", "Data Center and Application Assurance", 
+            "Software Defined Data Center", "Data Storage", "Data Protection", 
+            "Application Delivery", "Cloud Services", "Operating System", 
+            "Data Center Orchestration", "Data Center Observability", 
+            "Training", "Local Material", "Others (Non Sub-Pillar)"
+        ],
+        "Cyber Security": [
+            "DNS Security", "Next-Gen Firewall (NGFW)", "Endpoint Protection Platform (XDR, EDR)", 
+            "Secure Web Gateway", "E-Mail Security (E-Mail Gateway)", "SIEM", 
+            "Network Access Control", "Multi Factor Authentication", "Security Service Edge (SSE)", 
+            "Secure Access Service Edge (SASE)", "Web Application Firewall (WAF)", 
+            "Privileged Access Management (PAM)", "VA", "Threat Intelligence", 
+            "NDR", "SOAR", "WAAP (API Security, API Gateway)", "DLP", 
+            "Penetration Test", "ITDR", "Secure SD-WAN", "Secure Browser", 
+            "Fraud Detection System", "Operational Technology (OT) Security", 
+            "Training", "Local Material", "Others (Non Sub-Pillar)"
+        ],
+        "Others (Non-Pillar)" : [
+            "Others (Non Sub-Pillar)", 'Local Material', "Training"
+        ]
+    }
 
     current_user_name = st.session_state.get('presales_session', {}).get('username', 'Unknown')
 
@@ -1330,9 +1361,37 @@ def tab4():
         # ---------------------------------------------------------
         with t_prod:
             st.markdown("##### Product Solution")
+            
+            # 1. PILLAR UTAMA
             edited_pillar = st.selectbox("Pillar", all_pillars, 
                 index=get_index(all_pillars, lead.get('pillar')), key="edit_pillar")
             
+            # 2. LOGIKA MAINTENANCE SERVICES
+            edited_pillar_product = None
+            edited_solution_product = None
+            
+            if edited_pillar == "Maintenance Services":
+                st.info("🔧 Maintenance Details")
+                
+                # Menyiapkan dropdown Pillar Product
+                pp_opts = list(MAINTENANCE_MAPPING.keys())
+                
+                # Mencari nilai default dari database lama (jika ada)
+                default_pp_val = lead.get('pillar_product')
+                pp_index = pp_opts.index(default_pp_val) if default_pp_val in pp_opts else 0
+                
+                edited_pillar_product = st.selectbox("Pillar Product*", pp_opts, index=pp_index, key="edit_pp")
+                
+                # Menyiapkan dropdown Solution Product berdasarkan Pillar Product
+                sp_opts = MAINTENANCE_MAPPING.get(edited_pillar_product, [])
+                
+                # Mencari nilai default
+                default_sp_val = lead.get('solution_product')
+                sp_index = sp_opts.index(default_sp_val) if default_sp_val in sp_opts else 0
+                
+                edited_solution_product = st.selectbox("Solution Product*", sp_opts, index=sp_index, key="edit_sp")
+            
+            # 3. SOLUTION & SERVICE STANDAR
             solution_options = get_solutions(edited_pillar)
             edited_solution = st.selectbox("Solution", solution_options, 
                 index=get_index(solution_options, lead.get('solution')), key="edit_sol")
@@ -1486,6 +1545,8 @@ def tab4():
                     "sales_name": edited_sales_name,
                     "responsible_name": edited_responsible.get('Responsible') if isinstance(edited_responsible, dict) else edited_responsible,
                     "pillar": edited_pillar,
+                    "pillar_product": edited_pillar_product,
+                    "solution_product": edited_solution_product,
                     "solution": edited_solution,
                     "service": edited_service,
                     "brand": final_brand_str,
