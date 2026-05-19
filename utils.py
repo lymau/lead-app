@@ -536,7 +536,7 @@ def tab1(default_inputter=None):
 
                 if currency == "USD":
                     if line.get("brand") == "Cisco":
-                        discounted_usd = input_val * 0.25 # Hanya 25% dari input karena sudah termasuk diskon 75% untuk Cisco
+                        discounted_usd = input_val * 0.20 # Hanya 20% dari input karena sudah termasuk diskon 75% untuk Cisco
                         final_cost_idr = discounted_usd * current_rate
                         calc_info = f"ℹ️ **Cisco Logic:** ${input_val:,.0f} x 75% Disc = ${discounted_usd:,.0f} x (Rate Rp {current_rate:,.0f})"
                     else:
