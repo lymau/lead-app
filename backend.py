@@ -777,7 +777,8 @@ def check_and_remind_inactive_presales():
             if res_email['status'] == 200:
                 return {"status": 200, "message": f"Reminder terkirim ke email Anda! Ditemukan {len(inactive_users)} presales tidak aktif."}
             else:
-                return {"status": 500, "message": "Gagal mengirim email notifikasi."}
+                pesan_error_asli = res_email.get('message', 'Unknown Error')
+                return {"status": 500, "message": f"Gagal mengirim email: {pesan_error_asli}"}
 
     except Exception as e:
         logger.error(f"Error in inactive reminder: {str(e)}")
