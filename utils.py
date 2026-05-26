@@ -1321,9 +1321,9 @@ def tab4():
             if currency == "USD":
                 brand_name = lead.get('brand', '').strip()
                 if brand_name.lower() == "cisco":
-                    discounted_usd = input_val * 0.6
+                    discounted_usd = input_val * 0.2 # Diskon 80% (bayar 20%)
                     final_cost_idr = discounted_usd * current_rate
-                    calc_info = f"ℹ️ **Cisco Logic (50% Disc):** ${input_val:,.0f} x 0.5 x {current_rate} = Rp {format_number(final_cost_idr)}"
+                    calc_info = f"ℹ️ **Cisco Logic (80% Disc):** ${input_val:,.0f} x 0.2 x {current_rate} = Rp {format_number(final_cost_idr)}"
                 else:
                     final_cost_idr = input_val * current_rate
                     calc_info = f"ℹ️ **Conversion:** ${input_val:,.0f} x {current_rate} = Rp {format_number(final_cost_idr)}"
@@ -1818,8 +1818,10 @@ def tab6():
         st.error("Session expired.")
         return
 
+    # Clear cache spesifik hanya untuk fungsi ini agar tidak mereset cache master data
     if st.button("Refresh Log"):
-        st.cache_data.clear() 
+        db.get_activity_log_by_group.clear() 
+        st.toast("✅ Log direfresh dengan data terbaru dari database.")
     
     with st.spinner(f"Fetching logs..."):
         log_data = db.get_activity_log_by_group(current_user)
@@ -1829,29 +1831,56 @@ def tab6():
         
         # Standardize Columns
         rename_map = {
-            'timestamp': 'Timestamp', 'opportunity_name': 'Opportunity',
+            'timestamp': 'Timestamp', 'opportunity_name': 'Opportunity', 'OpportunityName': 'Opportunity',
             'user_name': 'User', 'action': 'Action',
             'field': 'Field', 'old_value': 'Old Val', 'new_value': 'New Val'
         }
         df_log.rename(columns=rename_map, inplace=True)
 
-        # UI Filter
-        users = sorted(df_log['User'].dropna().unique().astype(str)) if 'User' in df_log.columns else []
-        sel_user = st.multiselect("Filter User", users)
+        # =====================================================================
+        # UI Filter: Dibagi menjadi 3 kolom sejajar
+        # =====================================================================
+        col_f1, col_f2, col_f3 = st.columns(3)
         
+        with col_f1:
+            users = sorted(df_log['User'].dropna().unique().astype(str)) if 'User' in df_log.columns else []
+            sel_user = st.multiselect("Filter by User", users)
+            
+        with col_f2:
+            actions = sorted(df_log['Action'].dropna().unique().astype(str)) if 'Action' in df_log.columns else []
+            sel_action = st.multiselect("Filter by Action", actions)
+            
+        with col_f3:
+            # Mengambil daftar Opportunity unik dari log yang ditarik
+            opps = sorted(df_log['Opportunity'].dropna().unique().astype(str)) if 'Opportunity' in df_log.columns else []
+            sel_opp = st.multiselect("Filter by Opportunity", opps)
+        
+        # Eksekusi Filter
         if sel_user:
             df_log = df_log[df_log['User'].isin(sel_user)]
+        if sel_action:
+            df_log = df_log[df_log['Action'].isin(sel_action)]
+        if sel_opp:
+            df_log = df_log[df_log['Opportunity'].isin(sel_opp)]
             
-        # FORMATTING TANGGAL (FIXED)
+        # =====================================================================
+        # FORMATTING TANGGAL 
+        # =====================================================================
         if 'Timestamp' in df_log.columns and not df_log.empty:
-            # Paksa ke Datetime
             df_log['Timestamp'] = pd.to_datetime(df_log['Timestamp'], errors='coerce')
-            # Format ke String
-            df_log['Timestamp'] = df_log['Timestamp'].apply(
-                lambda x: x.strftime('%d-%m-%Y %H:%M:%S') if pd.notnull(x) else "-"
-            )
 
-        st.dataframe(df_log, use_container_width=True, hide_index=True)
+        # Render Dataframe
+        st.dataframe(
+            df_log, 
+            use_container_width=True, 
+            hide_index=True,
+            column_config={
+                "Timestamp": st.column_config.DatetimeColumn(
+                    "Timestamp",
+                    format="DD-MM-YYYY HH:mm:ss"
+                )
+            }
+        )
     else:
         st.info("No logs found.")
         
