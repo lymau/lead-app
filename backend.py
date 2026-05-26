@@ -550,7 +550,9 @@ def update_full_opportunity(payload):
                 UPDATE opportunities SET
                     uid=:nuid, opportunity_id=:noid, product_id=:npid,
                     salesgroup_id=:sg, sales_name=:sn,
-                    responsible_name=:pam, pillar=:p, solution=:s, service=:svc,
+                    responsible_name=:pam, pillar=:p, 
+                    pillar_product=:pp, solution_product=:sp, -- 👈 TAMBAHKAN INI
+                    solution=:s, service=:svc,
                     brand=:b, company_name=:cn, vertical_industry=:vi, distributor_name=:dn,
                     start_date=:sd, route_to_market=:rtm,
                     updated_at=NOW()
@@ -561,6 +563,8 @@ def update_full_opportunity(payload):
                 "nuid": new_uid, "noid": new_opp_id, "npid": new_product_id_code,
                 "sg": payload['salesgroup_id'], "sn": payload['sales_name'], 
                 "pam": payload['responsible_name'], "p": payload['pillar'], 
+                "pp": payload.get('pillar_product'),    # 👈 TAMBAHKAN INI
+                "sp": payload.get('solution_product'),  # 👈 TAMBAHKAN INI
                 "s": payload['solution'], "svc": payload['service'],
                 "b": payload['brand'], "cn": payload['company_name'],
                 "vi": payload['vertical_industry'], "dn": payload['distributor_name'],
