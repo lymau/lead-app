@@ -341,8 +341,8 @@ def add_multi_line_opportunity(parent_data, product_lines):
             if res_desc:
                 current_rows_id = res_desc['rows_id']
             else:
-                # Generate New Q1 ID
-                max_q = text("SELECT MAX(rows_id) FROM description WHERE rows_id LIKE 'Q1%' AND LENGTH(rows_id) = 6")
+                # Generate New Q2 ID (Diubah ke Q2)
+                max_q = text("SELECT MAX(rows_id) FROM description WHERE rows_id LIKE 'Q2%' AND LENGTH(rows_id) = 6")
                 max_val = conn.execute(max_q).scalar()
                 
                 new_seq = 1
@@ -350,7 +350,8 @@ def add_multi_line_opportunity(parent_data, product_lines):
                     try: new_seq = int(max_val[2:]) + 1
                     except: pass
                 
-                current_rows_id = f"Q1{str(new_seq).zfill(4)}"
+                # Menggunakan awalan Q2
+                current_rows_id = f"Q2{str(new_seq).zfill(4)}"
                 
                 # Insert Deskripsi Baru
                 conn.execute(text("INSERT INTO description (rows_id, description) VALUES (:rid, :desc)"), 
