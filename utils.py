@@ -1819,8 +1819,7 @@ def tab6():
         return
 
     # Clear cache spesifik hanya untuk fungsi ini agar tidak mereset cache master data
-    if st.button("Refresh Log"):
-        db.get_activity_log_by_group.clear() 
+    if st.button("Refresh Log"): 
         st.toast("✅ Log direfresh dengan data terbaru dari database.")
     
     with st.spinner(f"Fetching logs..."):
