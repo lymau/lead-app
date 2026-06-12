@@ -127,8 +127,7 @@ def clean_data_for_display(data):
 
     for col in ['cost', 'selling_price']:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-            df[col] = df[col].apply(lambda x: f"Rp {format_number(x)}")
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
 
     for date_col in ['start_date', 'created_at', 'updated_at']:
         if date_col in df.columns:
@@ -868,7 +867,13 @@ def tab2():
                         st.warning("⚠️ File BOQ belum dilampirkan.")
             # -----------------------------------------------------
             
-            st.dataframe(clean_data_for_display(detail_df), use_container_width=True)
+            st.dataframe(
+            clean_data_for_display(detail_df), 
+            use_container_width=True,
+            column_config={
+                "cost": st.column_config.NumberColumn("Cost (IDR)", format="Rp %d")
+            }
+        )
         else:
             st.warning("Details hidden by filter.")
             
