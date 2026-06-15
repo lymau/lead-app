@@ -292,6 +292,46 @@ def tab1(default_inputter=None):
             else:
                 responsible_name_final = pam_rule
                 st.text_input("Presales Account Manager", value=responsible_name_final, disabled=True, key="pam_locked_dc")
+                
+                
+        elif current_user_name == 'Kristanto Saputro' or current_access_group == 'ENT1':
+            st.info("🔓 Team Lead Override (ENT1 Team)")
+            
+            # 1. Filter nama presales berdasarkan PAM = Frebby Soegianto
+            # Asumsi: inputter_to_pam_map sudah ter-load di atasnya (dari get_pam_mapping_dict)
+            ent1_team_list = []
+            if inputter_to_pam_map:
+                ent1_team_list = [
+                    inputter for inputter, pam in inputter_to_pam_map.items() 
+                    if pam == 'Frebby Soegianto'
+                ]
+            
+            # Fallback (Jaring Pengaman) jika mapping kosong atau API database timeout
+            if not ent1_team_list:
+                ent1_team_list = ["Kristanto Saputro"]
+                
+            # Rapikan list (hapus duplikat dan urutkan abjad)
+            ent1_team_list = sorted(list(set([str(name) for name in ent1_team_list if name])))
+            
+            # Set default index ke nama Kristanto jika ada di list, jika tidak index 0
+            default_idx = ent1_team_list.index(current_user_name) if current_user_name in ent1_team_list else 0
+            
+            # 2. Render Dropdown untuk Inputter Name
+            selected_inputter_name = st.selectbox(
+                "Inputter (ENT1 Team Override)", 
+                options=ent1_team_list, 
+                index=default_idx, 
+                key="parent_inputter_override_ent1"
+            )
+            
+            # 3. Kunci kolom PAM statis ke Frebby Soegianto
+            responsible_name_final = "Frebby Soegianto"
+            st.text_input(
+                "Presales Account Manager", 
+                value=responsible_name_final, 
+                disabled=True, 
+                key="pam_locked_ent1"
+            )
 
         # ==============================================================
         # LOGIKA 3: AUTO-LOCK UNTUK USER BIASA (ENT_1, ENT_2, SP1A, dll)
