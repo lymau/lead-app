@@ -115,9 +115,9 @@ def clean_data_for_display(data):
         df = pd.DataFrame(data)
 
     desired_order = [
-        'uid', 'opportunity_id', 'project_id', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'route_to_market','company_name', 
+        'uid', 'opportunity_id', 'product_id', 'project_id', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'route_to_market','company_name', 'vertical_industry',
         'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 
-        'channel', 'distributor_name', 'cost', 'stage', 'notes', 'sales_notes', 'pillar_product', 'solution_product', 'created_at', 'updated_at'
+        'channel', 'distributor_name', 'cost', 'stage', 'notes', 'pillar_product', 'solution_product', 'created_at', 'updated_at'
     ]
     
     existing_cols = [col for col in desired_order if col in df.columns]
@@ -681,26 +681,7 @@ def tab1(default_inputter=None):
     presales_names = sorted([p['PresalesName'] for p in presales_data if p.get('Email')])
     email_map = {p['PresalesName']: p['Email'] for p in presales_data if p.get('Email')}
     
-    # =================================================================
-    # --- TAMBAHAN GROUP EMAIL (FRONTEND INJECTION) ---
-    # =================================================================
-    group_emails = {
-        "👥 [Group] Tim ENT1": "se.ent1@sisindokom.com",
-        "👥 [Group] Tim ENT2": "se.ent2@sisindokom.com",
-        "👥 [Group] Tim Data Center": "se.dc@sisindokom.com",
-        "👥 [Group] Tim Security": "se.security@sisindokom.com",
-        "👥 [Group] Tim IOH XL": "se.iohxl@sisindokom.com",
-        "👥 [Group] Tim 2-Tier SP": "se.2tiersp@sisindokom.com",
-        "👥 [Group] Tim Maintenance": "se.maintenance@sisindokom.com"
-    }
-    email_map.update(group_emails)
-    
-    # 2. Ekstrak nama-nama grup (sesuai urutan di dalam dictionary di atas)
-    group_names = list(group_emails.keys())
-    # =================================================================
-
-    # 3. Gabungkan list dengan urutan: [Group Emails] DULUAN, baru [Presales Names]
-    recipient_options = group_names + presales_names
+    recipient_options = presales_names
     
     default_recipients = [current_user_name] if current_user_name in recipient_options else []
 
