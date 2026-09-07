@@ -117,7 +117,7 @@ def clean_data_for_display(data):
     desired_order = [
         'uid', 'opportunity_id', 'product_id', 'project_id', 'presales_name', 'responsible_name','salesgroup_id','sales_name', 'route_to_market','company_name', 'vertical_industry',
         'opportunity_name', 'start_date', 'pillar', 'solution', 'service', 'brand', 
-        'channel', 'distributor_name', 'cost', 'stage', 'notes', 'pillar_product', 'solution_product', 'created_at', 'updated_at'
+        'channel', 'distributor_name', 'cost', 'selling_price', 'stage', 'notes', 'pillar_product', 'solution_product', 'created_at', 'updated_at'
     ]
     
     existing_cols = [col for col in desired_order if col in df.columns]
