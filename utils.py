@@ -550,6 +550,11 @@ def tab1(default_inputter=None):
                 # 2. Solution
                 sol_opts = get_solutions(line['pillar'])
                 line['solution'] = st.selectbox("Solution", sol_opts, key=f"solution_{line['id']}")
+                
+                # --- Tambahan Notifikasi Kondisional ---
+                if line['solution'] == "Others (Non Sub-Pillar)":
+                    st.info("ℹ️ **Keterangan:** Anda memilih **Others (Non Sub-Pillar)**. Mohon berikan informasi detail mengenai barang/item/solusi yang dimaksud pada kolom **Notes** di bawah agar solusi yang diinput bisa diklasifikasikan ke non existing solution yang belum ada di database.")
+                # ---------------------------------------
                 # 3. Service
                 svc_opts = get_services(line['solution'])
                 line['service'] = st.selectbox("Service", svc_opts, key=f"service_{line['id']}")
@@ -690,18 +695,32 @@ def tab1(default_inputter=None):
     )
 
     if st.button("Submit Opportunity and All Solutions", type="primary"):
-        channel_error = False
+        validation_error = False # Mengganti nama variabel agar lebih general
+        
         for idx, item in enumerate(st.session_state.product_lines):
+            # --- Validasi 1: Channel ---
             brand_channels = get_channels(item.get('brand'))
             if brand_channels and not item.get('channel'):
                 st.error(f"⚠️ Solution #{idx+1}: Mohon pilih **Channel** untuk Brand **{item.get('brand')}**.")
-                channel_error = True
-        if channel_error: st.stop()
+                validation_error = True
+                
+            # --- LOGIKA BARU: Validasi 2: Notes untuk 'Others' ---
+            if item.get('solution') == "Others (Non Sub-Pillar)":
+                # Cek apakah kunci 'notes' kosong, tidak ada, atau hanya berisi spasi
+                notes_val = item.get('notes', '')
+                if not notes_val or not str(notes_val).strip():
+                    st.error(f"❌ Solution #{idx+1}: Anda memilih **Others (Non Sub-Pillar)**. Kolom **Notes** wajib diisi untuk mengklasifikasikan barang/solusi!")
+                    validation_error = True
 
+        # Jika ada salah satu error di atas (Channel atau Notes), hentikan proses
+        if validation_error: 
+            st.stop()
+
+        # --- Validasi Data Induk (Sudah Ada Sebelumnya) ---
         if not company_name_final:
             st.error("❌ Nama Company wajib diisi/dipilih.")
             st.stop()
-        if not opportunity_name_final: # <--- Cek variabel ini
+        if not opportunity_name_final: 
             st.error("❌ Opportunity Name wajib diisi atau dibentuk secara sempurna.")
             st.stop()
 
