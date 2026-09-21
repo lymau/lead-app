@@ -1738,7 +1738,7 @@ def tab5():
 
             if new_stage == "Closed Won":
                 if current_user in authorized_admin_users:
-                    # Tampilan KHUSUS untuk Krisa & Ridha
+                    # Tampilan KHUSUS untuk Krisa & Maulidia
                     st.info("🎉 **Proyek Closed Won!** (Admin Access) Silakan lengkapi data finalisasi proyek di bawah ini.")
                     
                     col1, col2 = st.columns(2)
@@ -1748,7 +1748,7 @@ def tab5():
                         onedrive_link = st.text_input("🔗 OneDrive BOQ Link", placeholder="https://sisindokom-my.sharepoint.com/...")
                 else:
                     # Tampilan untuk Presales lainnya
-                    st.info("🎉 **Proyek Closed Won!** Hubungi tim Admin (Krisa / Ridha) untuk menerbitkan Project ID (PID) dan melampirkan BOQ.")
+                    st.info("🎉 **Proyek Closed Won!** Hubungi tim Admin (Krisa / Maulidia) untuk menerbitkan Project ID (PID) dan melampirkan BOQ.")
             # ==========================================================
 
             if st.button("💾 Update Stage", type="primary"):
