@@ -154,7 +154,7 @@ def main_app():
         
 
     # --- Tabs Navigation (Dynamic Rendering) ---
-    allowed_admins = ["Krisa Kurniawan", "Ridha Evitafany"]
+    allowed_admins = ["Krisa Kurniawan", "Maulidia Permatasari"]
     is_admin = username in allowed_admins
 
     # 1. Definisikan nama-nama Tab standar (Hanya 6 Tab)
