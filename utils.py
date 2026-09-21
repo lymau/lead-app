@@ -1734,7 +1734,7 @@ def tab5():
             onedrive_link = None
             project_id = None # Inisialisasi variabel baru
             
-            authorized_admin_users = ["Krisa Kurniawan", "Ridha Evitafany"]
+            authorized_admin_users = ["Krisa Kurniawan", "Maulidia Permatasari"]
 
             if new_stage == "Closed Won":
                 if current_user in authorized_admin_users:
