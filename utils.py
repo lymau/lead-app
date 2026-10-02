@@ -562,6 +562,8 @@ def tab1(default_inputter=None):
             with lc2:
                 # 4. Brand & Channel
                 line['brand'] = st.selectbox("Brand", unique_brands_list, key=f"brand_{line['id']}")
+                if line['brand'] == "Others":
+                    st.warning("You selected **Others**. Please specify the brand used in the **Notes** field below.")
                 avail_channels = get_channels(line.get('brand'))
                 default_idx = 0 if len(avail_channels) == 1 else None
                 line['channel'] = st.selectbox("Channel*", avail_channels, index=default_idx, placeholder="Select Channel...", key=f"channel_{line['id']}")
@@ -703,6 +705,12 @@ def tab1(default_inputter=None):
             if brand_channels and not item.get('channel'):
                 st.error(f"⚠️ Solution #{idx+1}: Mohon pilih **Channel** untuk Brand **{item.get('brand')}**.")
                 validation_error = True
+
+            if item.get('brand') == "Others":
+                notes_val = item.get('notes', '')
+                if not notes_val or not str(notes_val).strip():
+                    st.warning(f"⚠️ Solution #{idx+1}: Brand **Others** dipilih. Mohon isi **Notes** terlebih dahulu sebelum submit.")
+                    validation_error = True
                 
             # --- LOGIKA BARU: Validasi 2: Notes untuk 'Others' ---
             if item.get('solution') == "Others (Non Sub-Pillar)":
