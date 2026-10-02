@@ -146,7 +146,7 @@ def clean_data_for_display(data):
 # ==============================================================================
 
 @st.fragment
-def tab1(default_inputter=None): 
+def tab1():
     st.markdown("""
         <style>
         div[data-testid="stButton"] > button[kind="primary"] {
@@ -1150,9 +1150,6 @@ def tab3():
             total_opps_lines = len(df_filtered)
             total_unique_opps = df_filtered['opportunity_id'].nunique() if 'opportunity_id' in df_filtered.columns else 0
             total_unique_customers = df_filtered['company_name'].nunique() if 'company_name' in df_filtered.columns else 0
-            # KPI Total Value (Optional jika ingin diaktifkan)
-            total_value = df_filtered['cost'].sum() if 'cost' in df_filtered.columns else 0
-
             m1, m2, m3 = st.columns(3)
             m1.metric("Total Solution Lines", f"{total_opps_lines}")
             m2.metric("Unique Opportunities", f"{total_unique_opps}")
@@ -1280,7 +1277,7 @@ def tab4():
             
             # Mapping Label -> UID
             item_map = {}
-            for idx, row in subset.iterrows():
+            for _, row in subset.iterrows():
                 pillar = row.get('pillar') or "NoPillar"
                 brand = row.get('brand') or "NoBrand"
                 sol = row.get('solution') or "NoSol"

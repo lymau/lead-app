@@ -175,7 +175,7 @@ def main_app():
     tabs = st.tabs(tab_names)
     
     # 4. Panggil isi dari masing-masing Tab menggunakan indeks
-    with tabs[0]: utils.tab1(default_inputter=username)
+    with tabs[0]: utils.tab1()
     with tabs[1]: utils.tab2()
     with tabs[2]: utils.tab3()
     with tabs[3]: utils.tab4()
