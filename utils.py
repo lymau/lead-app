@@ -24,18 +24,27 @@ def get_master(action: str):
 
 @st.cache_data(ttl=3600) 
 def get_usd_to_idr_rate():
-    """Mengambil kurs USD ke IDR realtime dari API publik."""
-    fallback_rate = 16500 
-    api_url = "https://api.exchangerate-api.com/v4/latest/USD"
-    
-    try:
-        response = requests.get(api_url, timeout=5)
-        if response.status_code == 200:
+    """Mengambil kurs USD ke IDR dari API utama atau API cadangan."""
+    api_urls = (
+        "https://api.exchangerate-api.com/v4/latest/USD",
+        "https://open.er-api.com/v6/latest/USD",
+    )
+    last_error = None
+
+    for api_url in api_urls:
+        try:
+            response = requests.get(api_url, timeout=5)
+            response.raise_for_status()
             data = response.json()
-            return data['rates']['IDR']
-        return fallback_rate
-    except:
-        return fallback_rate
+            rates = data.get("rates") if isinstance(data, dict) else None
+            rate = rates.get("IDR") if isinstance(rates, dict) else None
+            if isinstance(rate, bool) or not isinstance(rate, (int, float)) or rate <= 0:
+                raise ValueError(f"Invalid IDR rate returned by {api_url}")
+            return float(rate)
+        except (requests.RequestException, ValueError, TypeError) as error:
+            last_error = error
+
+    raise RuntimeError("Could not retrieve the USD to IDR rate from any exchange-rate API") from last_error
 
 def get_pam_mapping_dict():
     data = get_master('getPAMMapping')
