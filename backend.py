@@ -515,6 +515,23 @@ def update_full_opportunity(payload):
             # 1. Ambil Data Lama
             old_data = conn.execute(text("SELECT * FROM opportunities WHERE uid=:uid"), {"uid": payload['uid']}).mappings().first()
             if not old_data: return {"status": 404, "message": "UID not found"}
+
+            if payload.get('add_company_to_master'):
+                company_exists = conn.execute(
+                    text("SELECT 1 FROM companies WHERE company_name = :name LIMIT 1"),
+                    {"name": payload['company_name']}
+                ).first()
+                if not company_exists:
+                    conn.execute(
+                        text("""
+                            INSERT INTO companies (company_name, vertical_industry)
+                            VALUES (:name, :vertical)
+                        """),
+                        {
+                            "name": payload['company_name'],
+                            "vertical": payload['vertical_industry']
+                        }
+                    )
             
             # 2. GENERATE NEW OPP ID (Jika Sales Group berubah)
             rows_id_part = ""
@@ -550,6 +567,7 @@ def update_full_opportunity(payload):
             upd_q = text("""
                 UPDATE opportunities SET
                     uid=:nuid, opportunity_id=:noid, product_id=:npid,
+                    cost=:cost, notes=:notes,
                     salesgroup_id=:sg, sales_name=:sn,
                     responsible_name=:pam, pillar=:p, 
                     pillar_product=:pp, solution_product=:sp, -- 👈 TAMBAHKAN INI
@@ -562,6 +580,7 @@ def update_full_opportunity(payload):
             
             conn.execute(upd_q, {
                 "nuid": new_uid, "noid": new_opp_id, "npid": new_product_id_code,
+                "cost": payload['cost'], "notes": payload['notes'],
                 "sg": payload['salesgroup_id'], "sn": payload['sales_name'], 
                 "pam": payload['responsible_name'], "p": payload['pillar'], 
                 "pp": payload.get('pillar_product'),    # 👈 TAMBAHKAN INI
@@ -576,6 +595,8 @@ def update_full_opportunity(payload):
             
             # 6. LOGGING PERUBAHAN FIELD
             fields_to_track = {
+                'cost': 'Cost',
+                'notes': 'Notes',
                 'salesgroup_id': 'Sales Group',
                 'sales_name': 'Sales Name',
                 'responsible_name': 'PAM',
@@ -590,10 +611,22 @@ def update_full_opportunity(payload):
             }
             
             for db_field, label in fields_to_track.items():
-                old_val = str(old_data[db_field]) if old_data[db_field] else ""
-                new_val = str(payload[db_field]) if payload[db_field] else ""
+                old_raw = old_data[db_field]
+                new_raw = payload[db_field]
+                old_val = str(old_raw) if old_raw else ""
+                new_val = str(new_raw) if new_raw else ""
+                if db_field == 'cost':
+                    old_cost = float(old_raw) if old_raw is not None else 0.0
+                    new_cost = float(new_raw) if new_raw is not None else 0.0
+                    changed = abs(old_cost - new_cost) > 0.01
+                    old_val = f"{old_cost:,.0f}"
+                    new_val = f"{new_cost:,.0f}"
+                elif db_field == 'notes':
+                    changed = old_val.strip() != new_val.strip()
+                else:
+                    changed = old_val != new_val
                 
-                if old_val != new_val:
+                if changed:
                     current_ts = get_now_jakarta()
                     log_q = text("""
                         INSERT INTO activity_logs (timestamp, opportunity_name, user_name, action, field, old_value, new_value)

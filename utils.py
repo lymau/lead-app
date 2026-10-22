@@ -591,9 +591,13 @@ def tab1():
 
                 if currency == "USD":
                     if line.get("brand") == "Cisco":
-                        discounted_usd = input_val * 0.20 # Hanya 20% dari input karena sudah termasuk diskon 75% untuk Cisco
+                        discounted_usd = input_val * 0.20
                         final_cost_idr = discounted_usd * current_rate
-                        calc_info = f"ℹ️ **Cisco Logic:** ${input_val:,.0f} x 75% Disc = ${discounted_usd:,.0f} x (Rate Rp {current_rate:,.0f})"
+                        calc_info = (
+                            f"ℹ️ **Cisco:** 20% × ${input_val:,.0f} × "
+                            f"kurs Rp {current_rate:,.0f}/USD = "
+                            f"Rp {format_number(final_cost_idr)}"
+                        )
                     else:
                         final_cost_idr = input_val * current_rate
                         calc_info = f"ℹ️ **Conversion:** ${input_val:,.0f} x (Rate Rp {current_rate:,.0f})"
@@ -1380,9 +1384,13 @@ def tab4():
             if currency == "USD":
                 brand_name = lead.get('brand', '').strip()
                 if brand_name.lower() == "cisco":
-                    discounted_usd = input_val * 0.2 # Diskon 80% (bayar 20%)
+                    discounted_usd = input_val * 0.20
                     final_cost_idr = discounted_usd * current_rate
-                    calc_info = f"ℹ️ **Cisco Logic (80% Disc):** ${input_val:,.0f} x 0.2 x {current_rate} = Rp {format_number(final_cost_idr)}"
+                    calc_info = (
+                        f"ℹ️ **Cisco:** 20% × ${input_val:,.0f} × "
+                        f"kurs Rp {current_rate:,.0f}/USD = "
+                        f"Rp {format_number(final_cost_idr)}"
+                    )
                 else:
                     final_cost_idr = input_val * current_rate
                     calc_info = f"ℹ️ **Conversion:** ${input_val:,.0f} x {current_rate} = Rp {format_number(final_cost_idr)}"
@@ -1584,22 +1592,14 @@ def tab4():
         st.markdown("---")
         if st.button("💾 Save All Changes", type="primary", use_container_width=True):
             with st.spinner("Saving changes to database..."):
-                if is_listed == "No" and final_company_str.strip() != "":
-                    db.add_master_company(final_company_str, derived_vertical)
-                # 1. Update Cost & Notes (Ex-Tab 4 logic)
-                res_cost = db.update_lead({
-                    "uid": lead['uid'], 
-                    "cost": final_cost_idr, 
-                    "notes": new_notes, 
-                    "user": current_user_name 
-                })
-
                 # Persiapan variabel Final Brand untuk payload dan email
                 final_brand_str = edited_brand.get('Brand') if isinstance(edited_brand, dict) else edited_brand
 
-                # 2. Update Header Detail (Ex-Tab 5 logic)
                 payload = lead.copy()
                 payload.update({
+                    "add_company_to_master": is_listed == "No" and bool(final_company_str.strip()),
+                    "cost": final_cost_idr,
+                    "notes": new_notes,
                     "salesgroup_id": edited_sales_group,
                     "sales_name": edited_sales_name,
                     "responsible_name": edited_responsible.get('Responsible') if isinstance(edited_responsible, dict) else edited_responsible,
@@ -1618,8 +1618,7 @@ def tab4():
                 })
                 res_full = db.update_full_opportunity(payload)
                 
-                # Evaluasi Hasil
-                if res_cost['status'] == 200 and res_full['status'] == 200:
+                if res_full.get('status') == 200:
                     st.session_state.edit_submission_message = "✅ Data (Cost & Full Details) Updated Successfully!"
                     
                     # ==========================================================
@@ -1682,7 +1681,7 @@ def tab4():
                     time.sleep(1.5)
                     st.rerun()
                 else:
-                    st.error(f"Failed to update some data. Cost msg: {res_cost['message']} | Detail msg: {res_full['message']}")
+                    st.error(f"Failed to update data: {res_full.get('message', 'Unknown database error')}")
 
 @st.fragment
 def tab5():
