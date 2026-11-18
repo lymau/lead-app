@@ -1,19 +1,39 @@
 import streamlit as st
 
 # ==============================================================================
+# 0. STATUS PENGUNCIAN APLIKASI & MIGRASI
+# ==============================================================================
+APP_LOCKED = True
+MIGRATION_URL = "https://sabd-app.live"
+MIGRATION_DOMAIN = "sabd-app.live"
+
+# ==============================================================================
 # 1. KONFIGURASI HALAMAN
 # ==============================================================================
-st.set_page_config(
-    page_title="Presales App - SISINDOKOM",
-    page_icon=":clipboard:",
-    initial_sidebar_state="expanded",
-    layout="wide"
-)
+if APP_LOCKED:
+    st.set_page_config(
+        page_title=f"Presales App - Migrasi ke {MIGRATION_DOMAIN}",
+        page_icon=":material/lock:",
+        initial_sidebar_state="collapsed",
+        layout="centered"
+    )
+else:
+    st.set_page_config(
+        page_title="Presales App - SISINDOKOM",
+        page_icon=":clipboard:",
+        initial_sidebar_state="expanded",
+        layout="wide"
+    )
 
 import time
 from logger_setup import logger
-import backend as db
-import utils
+
+if not APP_LOCKED:
+    import backend as db
+    import utils
+else:
+    db = None
+    utils = None
 
 # ==============================================================================
 # 2. SESSION STATE MANAGEMENT (Inisialisasi Variabel)
@@ -188,9 +208,140 @@ def main_app():
             utils.tab7()
 
 # ==============================================================================
-# 5. ROUTER UTAMA (LOGIC PERBAIKAN)
+# 5. HALAMAN APLIKASI DIKUNCI & MIGRASI
+# ==============================================================================
+def app_locked_page():
+    """Menampilkan halaman penguncian total dan arahan migrasi ke sabd-app.live."""
+    st.html(
+        """
+        <style>
+        .block-container {
+            max-width: 580px;
+            padding-top: clamp(1.75rem, 6vh, 4.5rem);
+            padding-bottom: 2.5rem;
+        }
+        .lock-header {
+            display: flex;
+            align-items: center;
+            gap: 0.875rem;
+            margin-bottom: 1.125rem;
+        }
+        .lock-icon-tile {
+            flex-shrink: 0;
+            width: 44px;
+            height: 44px;
+            border-radius: 10px;
+            background-color: #FEF3C7;
+            border: 1px solid #B45309;
+            color: #92400E;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .lock-heading-group {
+            min-width: 0;
+        }
+        .lock-brand {
+            font-size: 0.875rem;
+            font-weight: 600;
+            line-height: 1.3;
+            margin: 0;
+        }
+        .lock-title {
+            font-size: clamp(1.375rem, 2.5vw, 1.75rem);
+            font-weight: 700;
+            line-height: 1.25;
+            margin: 0.25rem 0 0 0;
+        }
+        div[data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-primary"],
+        div[data-testid="stLinkButton"] a {
+            background-color: #166534 !important;
+            border-color: #166534 !important;
+            color: #FFFFFF !important;
+            min-height: 48px !important;
+            font-weight: 600 !important;
+            cursor: pointer !important;
+            transition: background-color 0.15s ease, border-color 0.15s ease;
+        }
+        div[data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-primary"]:hover,
+        div[data-testid="stLinkButton"] a:hover {
+            background-color: #14532D !important;
+            border-color: #14532D !important;
+            color: #FFFFFF !important;
+        }
+        div[data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-primary"]:active,
+        div[data-testid="stLinkButton"] a:active {
+            background-color: #0F3F22 !important;
+            border-color: #0F3F22 !important;
+            color: #FFFFFF !important;
+        }
+        div[data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-primary"]:focus-visible,
+        div[data-testid="stLinkButton"] a:focus-visible {
+            outline: 2px solid transparent !important;
+            box-shadow: 0 0 0 2px #FFFFFF, 0 0 0 5px #14532D !important;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            div[data-testid="stLinkButton"] a[data-testid="stBaseLinkButton-primary"],
+            div[data-testid="stLinkButton"] a {
+                transition: none !important;
+            }
+        }
+        @media (max-width: 600px) {
+            .lock-header {
+                align-items: flex-start;
+            }
+        }
+        </style>
+        """
+    )
+
+    with st.container(border=True):
+        st.markdown(
+            (
+                '<div class="lock-header">'
+                '<div class="lock-icon-tile" aria-hidden="true">'
+                '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" '
+                'stroke="currentColor" stroke-width="2" '
+                'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+                '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>'
+                '<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>'
+                '</svg>'
+                '</div>'
+                '<div class="lock-heading-group">'
+                '<p class="lock-brand">Presales App - SISINDOKOM</p>'
+                '<h1 class="lock-title">Aplikasi ini sudah dikunci</h1>'
+                '</div>'
+                '</div>'
+            ),
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            f"Akses masuk dan seluruh pengelolaan data opportunity pada aplikasi lama ini sudah ditutup.\n\n"
+            f"Silakan lanjutkan pekerjaan Anda dengan bermigrasi ke **{MIGRATION_DOMAIN}**."
+        )
+
+        st.link_button(
+            f"Buka {MIGRATION_DOMAIN}",
+            MIGRATION_URL,
+            type="primary",
+            use_container_width=True,
+        )
+
+        st.markdown("**Alamat aplikasi baru** (salin jika perlu):")
+        st.code(MIGRATION_URL, language=None)
+
+# ==============================================================================
+# 6. ROUTER UTAMA (LOGIC PERBAIKAN)
 # ==============================================================================
 def main():
+    # 0. Kunci total seluruh akses apabila APP_LOCKED aktif
+    if APP_LOCKED:
+        st.session_state.presales_session = None
+        app_locked_page()
+        st.stop()
+        return
+
     # 1. Cek Login Session
     if not st.session_state.presales_session:
         login_page()
